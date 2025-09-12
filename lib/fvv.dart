@@ -74,9 +74,9 @@ class FVVV {
   bool operator ==(final other) => identical(this, other) || (other is FVVV && value == other.value);
 
   @override
-  int get hashCode => value.hashCode;
+  int get hashCode => (value ?? sub).hashCode;
   @override
-  String toString() => '$value';
+  String toString() => '${value ?? sub}';
 
   T? as<T>([final T? dfltVal]) {
     if (value is T) return value as T;
