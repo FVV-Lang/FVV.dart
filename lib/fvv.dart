@@ -71,7 +71,8 @@ class FVVV {
   void operator []=(final String key, final dynamic val) =>
       sub.containsKey(key) ? sub[key]!.value = val : sub[key] = FVVV(val);
   @override
-  bool operator ==(final other) => identical(this, other) || (other is FVVV && value == other.value);
+  bool operator ==(final other) =>
+      identical(this, other) || (other is FVVV && (value == other.value || sub == other.sub));
 
   @override
   int get hashCode => (value ?? sub).hashCode;
