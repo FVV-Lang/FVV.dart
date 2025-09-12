@@ -92,10 +92,12 @@ class FVVV {
   List<int> asInts([final List<int>? dfltVal]) => (as<List<int>>() ?? dfltVal ?? []).toList();
   List<double> asDoubles([final List<double>? dfltVal]) => (as<List<double>>() ?? dfltVal ?? []).toList();
   List<String> asStrings([final List<String>? dfltVal]) => (as<List<String>>() ?? dfltVal ?? []).toList();
+  List<FVVV> asFVVVs([final List<FVVV>? dfltVal]) => (as<List<FVVV>>() ?? dfltVal ?? []).toList();
   List<bool> asBoolsRef([final List<bool>? dfltVal]) => as<List<bool>>() ?? dfltVal ?? [];
   List<int> asIntsRef([final List<int>? dfltVal]) => as<List<int>>() ?? dfltVal ?? [];
   List<double> asDoublesRef([final List<double>? dfltVal]) => as<List<double>>() ?? dfltVal ?? [];
   List<String> asStringsRef([final List<String>? dfltVal]) => as<List<String>>() ?? dfltVal ?? [];
+  List<FVVV> asFVVVsRef([final List<FVVV>? dfltVal]) => as<List<FVVV>>() ?? dfltVal ?? [];
 
   bool get isEmpty {
     if (value == null) return true;
