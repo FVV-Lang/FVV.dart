@@ -72,7 +72,7 @@ class FVVV {
       sub.containsKey(key) ? sub[key]!.value = val : sub[key] = FVVV(val);
   @override
   bool operator ==(final other) =>
-      identical(this, other) || (other is FVVV && (value == other.value || sub == other.sub));
+      identical(this, other) || (other is FVVV && value == other.value && sub == other.sub);
 
   @override
   int get hashCode => (value ?? sub).hashCode;
@@ -240,32 +240,29 @@ class FVVV {
       return tmpKey;
     }
 
-    FVVV findKey(final String path, final List<_FVVVDat> stackDat) {
+    FVVV? findKey(final String path, final List<_FVVVDat> stackDat) {
       final tmpNames = path.trim().split('.');
-      late FVVV tmpKey;
-      bool find(final _FVVVDat idxDat) {
+      late FVVV? tmpKey;
+      for (var idx = stackDat.length - 1; idx >= 0; idx--) {
+        final idxDat = stackDat[idx];
         tmpKey = idxDat.idxKey;
         for (final key in tmpNames)
-          if (tmpKey.sub.containsKey(key))
-            tmpKey = tmpKey[key];
-          else
+          if (tmpKey?.sub.containsKey(key) ?? false)
+            tmpKey = tmpKey![key];
+          else {
+            tmpKey = idxDat.rootKey;
+            for (final key in tmpNames)
+              if (tmpKey?.sub.containsKey(key) ?? false)
+                tmpKey = tmpKey![key];
+              else {
+                tmpKey = null;
+                break;
+              }
             break;
-        if (tmpKey.isEmpty && tmpKey.sub.isEmpty) {
-          tmpKey = idxDat.rootKey;
-          for (final key in tmpNames)
-            if (tmpKey.sub.containsKey(key))
-              tmpKey = tmpKey[key];
-            else
-              break;
-        }
-        return tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty;
+          }
+        if (tmpKey != null) return tmpKey;
       }
-
-      for (var idx = stackDat.length - 1; idx >= 0; idx--) {
-        find(stackDat[idx]);
-        if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty) return tmpKey;
-      }
-      return tmpKey;
+      return null;
     }
 
     final tmpDesc = StringBuffer(), value = StringBuffer();
@@ -434,7 +431,7 @@ class FVVV {
                   idxDat.idxKey.value = double.tryParse(valueStr);
                 else {
                   final tmpKey = findKey(valueStr, fvvStack);
-                  if (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty) {
+                  if (tmpKey != null && (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty)) {
                     if (tmpKey.sub.isEmpty)
                       idxDat.idxKey.value = tmpKey.value;
                     else
