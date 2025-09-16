@@ -292,6 +292,8 @@ class FVVV {
           } else {
             idxDat.idxDesc = '$tmpDesc';
             tmpDesc.clear();
+            final key = findKey(idxDat.idxDesc, fvvStack);
+            if (key != null && key.isType<String>()) idxDat.idxDesc = key.asString();
             inDesc = false;
             return false;
           }
