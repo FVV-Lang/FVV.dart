@@ -61,6 +61,8 @@ class _FVVVDat {
   late FVVV idxKey;
 }
 
+enum FVVFormatOpt { common, min, bigList, noDesc }
+
 class FVVV {
   FVVV([this.value, final Map<String, FVVV>? sub, this.desc = '', this.link = '']) : sub = sub ?? {};
   dynamic value;
@@ -113,29 +115,20 @@ class FVVV {
   bool isType<T>() => getType() is T;
   Type getType() => value is FVVV ? (value as FVVV).getType() : value.runtimeType;
 
-  String print([final String type = 'common', final int indentLv = 0]) {
-    var isMin = false, isBiglist = false, isNodesc = false;
-    switch (type) {
-      case 'min':
-        isMin = true;
-      case 'biglist':
-        isBiglist = true;
-      case 'nodesc':
-        isNodesc = true;
-    }
+  String print([final FVVFormatOpt opt = FVVFormatOpt.common, final int indentLv = 0]) {
     final result = StringBuffer();
     var printFunc = (final String path, final FVVV node, final int indentLv) {};
     printFunc = (final path, final node, final indentLv) {
       if (path.isEmpty || (node.isEmpty && node.sub.isEmpty)) return;
       final indent = ' ' * indentLv * 2;
       if (node.sub.isNotEmpty && node.link.isEmpty) {
-        if (isMin)
+        if (opt == FVVFormatOpt.min)
           result.write('$path={');
         else
           result.write('$indent$path = {\n');
       }
       if (node.link.isNotEmpty || node.value != null) {
-        if (isMin)
+        if (opt == FVVFormatOpt.min)
           result.write('$path=');
         else
           result.write('$indent$path = ');
@@ -146,34 +139,43 @@ class FVVV {
             case final String v:
               result.write('"${v.replaceAll('"', r'\"')}"');
             case List<dynamic> _:
+              if (node.desc.isNotEmpty && node.value is List<FVVV>) {
+                result.write('<${node.desc.replaceAll('>', r'\>')}>');
+                if (opt != FVVFormatOpt.min) result.write(' ');
+              }
               final listIndent = ' ' * (indentLv + 1) * 2;
               void writeList<T>(
                 final List<T> list,
                 final void Function(T) printer,
               ) {
                 for (final value in list) {
-                  if (isBiglist) result.write(listIndent);
+                  if (opt == FVVFormatOpt.bigList) result.write(listIndent);
                   printer(value);
-                  if (isBiglist)
+                  if (opt == FVVFormatOpt.bigList)
                     result.writeln();
                   else {
                     result.write(',');
-                    if (!isMin) result.write(' ');
+                    if (opt != FVVFormatOpt.min) result.write(' ');
                   }
                 }
               }
               result.write('[');
-              if (isBiglist || node.value is List<FVVV>) result.writeln();
+              if (opt == FVVFormatOpt.bigList || (opt != FVVFormatOpt.min && node.value is List<FVVV>))
+                result.writeln();
               switch (node.value) {
                 case final List<String> v:
                   writeList(v, (final value) => result.write('"${value.replaceAll('"', r'\"')}"'));
                 case final List<FVVV> v:
                   for (final value in v) {
-                    if (!isMin) result.write(listIndent);
+                    if (opt != FVVFormatOpt.min) result.write(listIndent);
+                    if (value.desc.isNotEmpty) {
+                      result.write('<${value.desc.replaceAll('>', r'\>')}>');
+                      if (opt != FVVFormatOpt.min) result.write(' ');
+                    }
                     result.write('{');
-                    if (!isMin) result.writeln();
-                    result.write(value.print(type, indentLv + 2));
-                    if (isMin)
+                    if (opt != FVVFormatOpt.min) result.writeln();
+                    result.write(value.print(opt, indentLv + 2));
+                    if (opt == FVVFormatOpt.min)
                       result.write(';}');
                     else {
                       result
@@ -181,11 +183,7 @@ class FVVV {
                         ..write(listIndent)
                         ..write('}');
                     }
-                    if (value.desc.isNotEmpty) {
-                      if (!isMin) result.write(' ');
-                      result.write('<${value.desc.replaceAll('>', r'\>')}>');
-                    }
-                    if (isMin)
+                    if (opt == FVVFormatOpt.min)
                       result.write(',');
                     else
                       result.writeln();
@@ -193,11 +191,11 @@ class FVVV {
                 default:
                   writeList(node.value as List, result.write);
               }
-              if (isBiglist || node.value is List<FVVV>)
+              if (opt == FVVFormatOpt.bigList || (opt != FVVFormatOpt.min && node.value is List<FVVV>))
                 result.write(indent);
               else if ((node.value as List).isNotEmpty) {
                 result.removeLastChar();
-                if (!isMin) result.removeLastChar();
+                if (opt != FVVFormatOpt.min) result.removeLastChar();
               }
               result.write(']');
             default:
@@ -207,12 +205,14 @@ class FVVV {
       } else
         node.sub.forEach((final String key, final FVVV value) => printFunc(key, value, indentLv + 1));
       if (node.sub.isNotEmpty && node.link.isEmpty) {
-        if (!isMin) result.write(indent);
+        if (opt != FVVFormatOpt.min) result.write(indent);
         result.write('}');
       }
-      if (node.desc.isNotEmpty && !isMin && !isNodesc)
-        result.write(' <${node.desc.replaceAll('>', r'\>')}>');
-      if (isMin)
+      if (node.desc.isNotEmpty &&
+          node.value! is List<FVVV> &&
+          opt != FVVFormatOpt.min &&
+          opt != FVVFormatOpt.noDesc) result.write(' <${node.desc.replaceAll('>', r'\>')}>');
+      if (opt == FVVFormatOpt.min)
         result.write(';');
       else
         result.writeln();
@@ -221,7 +221,7 @@ class FVVV {
     return '${result..removeLastChar()}';
   }
 
-  void addFromString(String txt) {
+  void parseString(String txt) {
     if (txt.startsWith('\u{FEFF}')) txt = txt.substring(1);
     txt = txt.trim().replaceAll(RegExp(r'\r\n|\r'), '\n');
     if (txt.isEmpty) return;
