@@ -28,6 +28,7 @@ linter:
         require_trailing_commas: true
         specify_nonobvious_property_types: false
         strict_top_level_inference: false
+        switch_on_type: false
         type_annotate_public_apis: false
         unnecessary_null_aware_operator_on_extension_on_nullable: true
         use_truncating_division: true

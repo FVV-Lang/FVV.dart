@@ -11,492 +11,505 @@
 //====================================================================================================
 
 import 'dart:core';
+import 'dart:typed_data';
 
-extension _FVVStrBfExt on StringBuffer {
-  void removeLastChar() {
-    var result = '$this';
-    if (result.isEmpty) return;
-    result = result.substring(0, result.length - 1);
-    clear();
-    write(result);
-  }
-}
-
-class _FVVVDat {
-  _FVVVDat({
-    final StringBuffer? valueName,
-    final String? idxDesc,
-    final List<String>? valueNames,
-    final List<String>? groupNames,
-    final List<List<String>>? lastGroupNames,
-    final List<FVVV>? tmpFvvs,
-    final bool? inValue,
-    final bool? inList,
-    final bool? isList,
-    final int? groupNum,
-    final FVVV? rootKey,
-  })  : valueName = valueName ?? StringBuffer(),
-        idxDesc = idxDesc ?? '',
-        valueNames = valueNames ?? [],
-        groupNames = groupNames ?? [],
-        lastGroupNames = lastGroupNames ?? [],
-        tmpFVVs = tmpFvvs ?? [],
-        inValue = inValue ?? false,
-        inList = inList ?? false,
-        isList = isList ?? false,
-        groupNum = groupNum ?? 0,
-        rootKey = rootKey ?? FVVV() {
-    idxKey = this.rootKey;
-  }
-
-  StringBuffer valueName;
-  String idxDesc;
-  List<String> valueNames;
-  List<String> groupNames;
-  List<List<String>> lastGroupNames;
-  List<FVVV> tmpFVVs;
-  bool inValue, inList, isList;
-  int groupNum;
-  FVVV rootKey;
-  late FVVV idxKey;
-}
-
-enum FVVFormatOpt { common, min, bigList, noDesc }
+import 'package:collection/collection.dart';
+import 'package:indent/indent.dart';
 
 class FVVV {
-  FVVV([this.value, final Map<String, FVVV>? sub, this.desc = '', this.link = '']) : sub = sub ?? {};
-  dynamic value;
-  Map<String, FVVV> sub;
+  FVVV({final dynamic value, final Map<String, FVVV>? nodes, this.desc = '', this.link = ''})
+      : _value = value,
+        nodes = nodes ?? {};
+  dynamic _value;
+  Map<String, FVVV> nodes;
   String desc, link;
 
-  FVVV operator [](final String key) => sub.putIfAbsent(key, FVVV.new);
-  void operator []=(final String key, final dynamic val) =>
-      sub.containsKey(key) ? sub[key]!.value = val : sub[key] = FVVV(val);
+  FVVV operator [](final String key) =>
+      key.split('.').fold(this, (final tgt, final path) => tgt.nodes.putIfAbsent(path, FVVV.new));
+  void operator []=(final String key, final dynamic val) => this[key].value = val;
+  dynamic get value => _value;
+  set value(final dynamic val) => _value = val is FVVV ? val._value : val;
   @override
   bool operator ==(final other) =>
-      identical(this, other) || (other is FVVV && value == other.value && sub == other.sub);
+      identical(this, other) ||
+      (other is FVVV &&
+          _value == other._value &&
+          const MapEquality<String, FVVV>().equals(other.nodes, nodes));
+  @override
+  int get hashCode => Object.hash(_value, const MapEquality<String, FVVV>().hash(nodes));
 
   @override
-  int get hashCode => (value ?? sub).hashCode;
-  @override
-  String toString() => '${value ?? sub}';
+  String toString() => '${_value ?? nodes}';
 
-  T? as<T>([final T? dfltVal]) {
-    if (value is T) return value as T;
-    if (value is FVVV) return (value as FVVV).as<T>(dfltVal) as T;
-    return dfltVal;
-  }
-
-  bool asBool([final bool dfltVal = false]) => as<bool>() ?? dfltVal;
-  int asInt([final int dfltVal = 0]) => as<int>() ?? dfltVal;
-  double asDouble([final double dfltVal = 0]) => as<double>() ?? dfltVal;
-  String asString([final String dfltVal = '']) => as<String>() ?? dfltVal;
-  List<bool> asBools([final List<bool>? dfltVal]) => (as<List<bool>>() ?? dfltVal ?? []).toList();
-  List<int> asInts([final List<int>? dfltVal]) => (as<List<int>>() ?? dfltVal ?? []).toList();
-  List<double> asDoubles([final List<double>? dfltVal]) => (as<List<double>>() ?? dfltVal ?? []).toList();
-  List<String> asStrings([final List<String>? dfltVal]) => (as<List<String>>() ?? dfltVal ?? []).toList();
-  List<FVVV> asFVVVs([final List<FVVV>? dfltVal]) => (as<List<FVVV>>() ?? dfltVal ?? []).toList();
-  List<bool> asBoolsRef([final List<bool>? dfltVal]) => as<List<bool>>() ?? dfltVal ?? [];
-  List<int> asIntsRef([final List<int>? dfltVal]) => as<List<int>>() ?? dfltVal ?? [];
-  List<double> asDoublesRef([final List<double>? dfltVal]) => as<List<double>>() ?? dfltVal ?? [];
-  List<String> asStringsRef([final List<String>? dfltVal]) => as<List<String>>() ?? dfltVal ?? [];
-  List<FVVV> asFVVVsRef([final List<FVVV>? dfltVal]) => as<List<FVVV>>() ?? dfltVal ?? [];
-
-  bool get isEmpty {
-    if (value == null) return true;
-    if (value is String) return (value as String).isEmpty;
-    if (value is List) return (value as List).isEmpty;
-    if (value is FVVV) return (value as FVVV).isEmpty;
-    return false;
-  }
+  bool get isEmpty => switch (_value) {
+        null => true,
+        final String str => str.isEmpty,
+        final List<dynamic> list => list.isEmpty,
+        _ => false
+      };
 
   bool get isNotEmpty => !isEmpty;
 
-  bool isType<T>() => getType() is T;
-  Type getType() => value is FVVV ? (value as FVVV).getType() : value.runtimeType;
+  bool isType<T>() => _value is T;
+  Type get type => _value.runtimeType;
 
-  String print([final FVVFormatOpt opt = FVVFormatOpt.common, final int indentLv = 0]) {
-    final result = StringBuffer();
-    var printFunc = (final String path, final FVVV node, final int indentLv) {};
-    printFunc = (final path, final node, final indentLv) {
-      if (path.isEmpty || (node.isEmpty && node.sub.isEmpty)) return;
-      final indent = ' ' * indentLv * 2;
-      if (node.sub.isNotEmpty && node.link.isEmpty) {
-        if (opt == FVVFormatOpt.min)
-          result.write('$path={');
-        else
-          result.write('$indent$path = {\n');
-      }
-      if (node.link.isNotEmpty || node.value != null) {
-        if (opt == FVVFormatOpt.min)
-          result.write('$path=');
-        else
-          result.write('$indent$path = ');
-        if (node.link.isNotEmpty)
-          result.write(node.link);
-        else {
-          switch (node.value) {
-            case final String v:
-              result.write('"${v.replaceAll('"', r'\"')}"');
-            case List<dynamic> _:
-              if (node.desc.isNotEmpty && node.value is List<FVVV>) {
-                result.write('<${node.desc.replaceAll('>', r'\>')}>');
-                if (opt != FVVFormatOpt.min) result.write(' ');
-              }
-              final listIndent = ' ' * (indentLv + 1) * 2;
-              void writeList<T>(
-                final List<T> list,
-                final void Function(T) printer,
-              ) {
-                for (final value in list) {
-                  if (opt == FVVFormatOpt.bigList) result.write(listIndent);
-                  printer(value);
-                  if (opt == FVVFormatOpt.bigList)
-                    result.writeln();
-                  else {
-                    result.write(',');
-                    if (opt != FVVFormatOpt.min) result.write(' ');
-                  }
-                }
-              }
-              result.write('[');
-              if (opt == FVVFormatOpt.bigList || (opt != FVVFormatOpt.min && node.value is List<FVVV>))
-                result.writeln();
-              switch (node.value) {
-                case final List<String> v:
-                  writeList(v, (final value) => result.write('"${value.replaceAll('"', r'\"')}"'));
-                case final List<FVVV> v:
-                  for (final value in v) {
-                    if (opt != FVVFormatOpt.min) result.write(listIndent);
-                    if (value.desc.isNotEmpty) {
-                      result.write('<${value.desc.replaceAll('>', r'\>')}>');
-                      if (opt != FVVFormatOpt.min) result.write(' ');
-                    }
-                    result.write('{');
-                    if (opt != FVVFormatOpt.min) result.writeln();
-                    result.write(value.print(opt, indentLv + 2));
-                    if (opt == FVVFormatOpt.min)
-                      result.write(';}');
-                    else {
-                      result
-                        ..writeln()
-                        ..write(listIndent)
-                        ..write('}');
-                    }
-                    if (opt == FVVFormatOpt.min)
-                      result.write(',');
-                    else
-                      result.writeln();
-                  }
-                default:
-                  writeList(node.value as List, result.write);
-              }
-              if (opt == FVVFormatOpt.bigList || (opt != FVVFormatOpt.min && node.value is List<FVVV>))
-                result.write(indent);
-              else if ((node.value as List).isNotEmpty) {
-                result.removeLastChar();
-                if (opt != FVVFormatOpt.min) result.removeLastChar();
-              }
-              result.write(']');
-            default:
-              result.write(node.value);
-          }
-        }
-      } else
-        node.sub.forEach((final String key, final FVVV value) => printFunc(key, value, indentLv + 1));
-      if (node.sub.isNotEmpty && node.link.isEmpty) {
-        if (opt != FVVFormatOpt.min) result.write(indent);
-        result.write('}');
-      }
-      if (node.desc.isNotEmpty &&
-          node.value! is List<FVVV> &&
-          opt != FVVFormatOpt.min &&
-          opt != FVVFormatOpt.noDesc) result.write(' <${node.desc.replaceAll('>', r'\>')}>');
-      if (opt == FVVFormatOpt.min)
-        result.write(';');
-      else
-        result.writeln();
-    };
-    sub.forEach((final String key, final FVVV value) => printFunc(key, value, indentLv));
-    return '${result..removeLastChar()}';
+  T? as<T>([final T? defaultValue]) => _value is T ? _value as T : defaultValue;
+  T get<T>() => as()!;
+  List<T> list<T>(final List<T>? defaultValue) => as(defaultValue) ?? <T>[];
+
+  static final Uint8List _escapeTable = () {
+    final table = Uint8List(1 << 8);
+
+    table['b'.codeUnitAt(0)] = '\b'.codeUnitAt(0);
+    table['f'.codeUnitAt(0)] = '\f'.codeUnitAt(0);
+    table['n'.codeUnitAt(0)] = '\n'.codeUnitAt(0);
+    table['r'.codeUnitAt(0)] = '\r'.codeUnitAt(0);
+    table['t'.codeUnitAt(0)] = '\t'.codeUnitAt(0);
+    table[r'\'.codeUnitAt(0)] = r'\'.codeUnitAt(0);
+
+    return table;
+  }();
+  void parseString(final String text) {
+    if (text.trim().isEmpty) return;
+
+    final ctx = _TextCtx(text);
+    final scopeStack = <FVVV>[];
+
+    ctx.skipBlanks();
+    final hasWrapper = ctx.matchAny(['{', '｛']);
+    _parseMain(ctx, scopeStack);
+
+    if (hasWrapper) {
+      ctx.skipBlanks();
+      if (!ctx.matchAny(['}', '｝'])) throw ctx.err.notFound('wrapper');
+    }
+    ctx.skipBlanks();
+    if (!ctx.isEof) throw ctx.err.whyNotEOF();
   }
 
-  void parseString(String txt) {
-    if (txt.startsWith('\u{FEFF}')) txt = txt.substring(1);
-    txt = txt.trim().replaceAll(RegExp(r'\r\n|\r'), '\n');
-    if (txt.isEmpty) return;
-    if (String.fromCharCode(txt.runes.last) != '}') txt += '\n';
-
-    bool eqOr<T>(final List<T> values) {
-      if (values.isEmpty) return false;
-      final first = values[0];
-      for (var i = 1; i < values.length; i++) if (first == values[i]) return true;
-      return false;
-    }
-
-    FVVV getKey(final List<String> paths, final FVVV rootKey) {
-      var tmpKey = rootKey;
-      for (final path in paths) tmpKey = tmpKey[path];
-      return tmpKey;
-    }
-
-    FVVV? findKey(final String path, final List<_FVVVDat> stackDat) {
-      final tmpNames = path.trim().split('.');
-      late FVVV? tmpKey;
-      for (var idx = stackDat.length - 1; idx >= 0; idx--) {
-        final idxDat = stackDat[idx];
-        tmpKey = idxDat.idxKey;
-        for (final key in tmpNames)
-          if (tmpKey?.sub.containsKey(key) ?? false)
-            tmpKey = tmpKey![key];
+  void _parseMain(final _TextCtx ctx, final List<FVVV> scopeStack) {
+    FVVV? findKey(final String path, final List<FVVV> scopeStack) {
+      final paths = path.split('.');
+      if (paths.isEmpty) return null;
+      FVVV? target;
+      for (final index in scopeStack.reversed) {
+        target = index;
+        for (final idxPath in paths) {
+          if (target!.nodes.containsKey(idxPath))
+            target = target[idxPath];
           else {
-            tmpKey = idxDat.rootKey;
-            for (final key in tmpNames)
-              if (tmpKey?.sub.containsKey(key) ?? false)
-                tmpKey = tmpKey![key];
-              else {
-                tmpKey = null;
-                break;
-              }
+            target = null;
             break;
           }
-        if (tmpKey != null) return tmpKey;
+        }
+        if (target != null) return target;
       }
       return null;
     }
 
-    final tmpDesc = StringBuffer(), value = StringBuffer();
-    final values = <String>[];
-    var oldFVV = false,
-        endGroup = false,
-        isRealChar = false,
-        inDesc = false,
-        inStr = false,
-        isStr = false,
-        isAllStr = false,
-        isEmptyStr = false;
-    var idxChar = '', lastChar = '';
-    var idx = 0;
-    final fvvStack = [_FVVVDat(rootKey: this)];
-    for (final rune in txt.runes) {
-      idxChar = String.fromCharCode(rune);
-      isRealChar = lastChar != r'\';
-      final idxDat = fvvStack.last;
-      idxDat.idxKey = idxDat.rootKey;
-      if ((() {
-        if (inDesc) {
-          if (idxChar != '>' || !isRealChar) {
-            if (idxChar == '>') tmpDesc.removeLastChar();
-            if (idxDat.inValue || idxDat.groupNum > 0) tmpDesc.write(idxChar);
-            return false;
-          } else {
-            idxDat.idxDesc = '$tmpDesc';
-            tmpDesc.clear();
-            final key = findKey(idxDat.idxDesc, fvvStack);
-            if (key != null && key.isType<String>()) idxDat.idxDesc = key.asString();
-            inDesc = false;
-            return false;
-          }
-        } else {
-          if (!inStr && eqOr([idxChar, ' ', '\t'])) return false;
-          if (idxChar == '<') {
-            inDesc = true;
-            return false;
-          }
-        }
-        if (idxDat.inValue) {
-          if (inStr) {
-            if (idxChar == '"') {
-              if (isRealChar) {
-                isEmptyStr = value.isEmpty;
-                inStr = false;
-                return false;
-              } else {
-                value
-                  ..removeLastChar()
-                  ..write(idxChar);
-                return false;
-              }
-            } else {
-              value.write(idxChar);
-              return false;
-            }
-          } else {
-            if (idxChar == '"') {
-              inStr = isStr = isAllStr = true;
-              return false;
-            } else if (idxChar == '[') {
-              idxDat.inList = idxDat.isList = true;
-              return false;
-            } else if (idxDat.inList && idxChar == '{') {
-              fvvStack.add(_FVVVDat());
-              return false;
-            } else if (idxDat.inList && eqOr([idxChar, ',', ']', '\n'])) {
-              if (idxChar == ']') {
-                idxDat.inList = false;
-                var pos = idxChar.length;
-                var inListDesc = false;
-                for (;;) {
-                  if (() {
-                    switch (txt[idx - pos]) {
-                      case '<':
-                        if (!inListDesc) return true;
-                        if (idx - pos < 1 || txt[idx - pos - 1] != r'\') inListDesc = false;
-                        return false;
-                      case '>':
-                        inListDesc = true;
-                        return false;
-                      case ' ':
-                      case '\t':
-                        return false;
-                      case ',':
-                      case '\n':
-                      default:
-                        return !inListDesc;
-                    }
-                  }()) break;
-                  pos++;
-                }
-                if (txt[idx - pos] == ',' || txt[idx - pos] == '\n') return false;
-              } else if (idxDat.tmpFVVs.isEmpty && value.isEmpty && (!isAllStr || !isEmptyStr))
-                return false;
-              final valueStr = '$value';
-              if ((isAllStr && isStr) ||
-                  eqOr([valueStr, 'true', 'false']) ||
-                  int.tryParse(valueStr) != null ||
-                  double.tryParse(valueStr) != null) {
-                values.add(valueStr);
-              } else {
-                idxDat.idxKey = getKey([valueStr], getKey(idxDat.groupNames, idxDat.idxKey));
-                if (idxDat.idxKey.isNotEmpty) {
-                  switch (idxDat.idxKey.value) {
-                    case final List<FVVV> v:
-                      idxDat.tmpFVVs.addAll(v.toList());
-                    case final List<dynamic> v:
-                      values.addAll(v.map((final v) => '$v'));
-                    default:
-                      values.add('${idxDat.idxKey.value}');
-                  }
-                }
-              }
-              if (idxDat.tmpFVVs.isNotEmpty && idxDat.idxDesc.isNotEmpty) {
-                idxDat.tmpFVVs.last.desc = idxDat.idxDesc;
-                idxDat.idxDesc = '';
-              }
-              if (isEmptyStr)
-                isEmptyStr = false;
-              else
-                value.clear();
-              isStr = false;
-              return false;
-            } else if (idxChar == '{') {
-              idxDat.groupNames.addAll(idxDat.valueNames);
-              idxDat.lastGroupNames.add(idxDat.valueNames.toList());
-              idxDat.valueNames.clear();
-              idxDat.groupNum++;
-              idxDat.inValue = false;
-              return false;
-            } else if (!idxDat.inList && eqOr([idxChar, ';', '\n'])) {
-              idxDat.idxKey = getKey(idxDat.valueNames, getKey(idxDat.groupNames, idxDat.rootKey));
-              if (idxDat.isList) {
-                if (values.isEmpty && idxDat.tmpFVVs.isEmpty)
-                  idxDat.idxKey.value = null;
-                else if (idxDat.tmpFVVs.isNotEmpty)
-                  idxDat.idxKey.value = idxDat.tmpFVVs.toList();
-                else if (isAllStr)
-                  idxDat.idxKey.value = values.toList();
-                else {
-                  final tmpStr = values[0];
-                  if (eqOr([tmpStr, 'true', 'false'])) {
-                    final tmps = <bool>[];
-                    for (final s in values) tmps.add(s == 'true');
-                    idxDat.idxKey.value = tmps;
-                  } else if (int.tryParse(tmpStr) != null) {
-                    final tmps = <int>[];
-                    for (final s in values) tmps.add(int.tryParse(s)!);
-                    idxDat.idxKey.value = tmps;
-                  } else if (double.tryParse(tmpStr) != null) {
-                    final tmps = <double>[];
-                    for (final s in values) tmps.add(double.tryParse(s)!);
-                    idxDat.idxKey.value = tmps;
-                  }
-                }
-              } else {
-                final valueStr = '$value';
-                if (isAllStr)
-                  idxDat.idxKey.value = valueStr;
-                else if (eqOr([valueStr, 'true', 'false']))
-                  idxDat.idxKey.value = valueStr == 'true';
-                else if (int.tryParse(valueStr) != null)
-                  idxDat.idxKey.value = int.tryParse(valueStr);
-                else if (double.tryParse(valueStr) != null)
-                  idxDat.idxKey.value = double.tryParse(valueStr);
-                else {
-                  final tmpKey = findKey(valueStr, fvvStack);
-                  if (tmpKey != null && (tmpKey.isNotEmpty || tmpKey.sub.isNotEmpty)) {
-                    if (tmpKey.sub.isEmpty)
-                      idxDat.idxKey.value = tmpKey.value;
-                    else
-                      idxDat.idxKey.sub = tmpKey.sub;
-                    idxDat.idxKey.link = valueStr;
-                  }
-                }
-              }
-              idxDat.idxKey.desc = idxDat.idxDesc;
-              idxDat.idxDesc = '';
-              value.clear();
-              values.clear();
-              idxDat.valueNames.clear();
-              idxDat.tmpFVVs.clear();
-              idxDat.inValue = isStr = isAllStr = idxDat.isList = false;
-              return false;
-            } else {
-              value.write(idxChar);
-              return false;
-            }
-          }
-        } else if (!oldFVV && idxChar == '{' && idxDat.valueName.isEmpty) {
-          oldFVV = true;
-          return false;
-        } else if (idxChar == '=') {
-          idxDat.valueNames = '${idxDat.valueName}'.trim().split('.');
-          idxDat.valueName.clear();
-          idxDat.inValue = true;
-          return false;
-        } else if (endGroup && eqOr([idxChar, ';', '\n']) && idxDat.groupNum > 0) {
-          endGroup = false;
-          if (idxDat.idxDesc.isNotEmpty) {
-            getKey(idxDat.groupNames, idxDat.rootKey).desc = idxDat.idxDesc;
-            idxDat.idxDesc = '';
-          }
-          for (final _ in idxDat.lastGroupNames.last)
-            idxDat.groupNames = idxDat.groupNames.sublist(0, idxDat.groupNames.length - 1);
-          idxDat.lastGroupNames = idxDat.lastGroupNames.sublist(
-            0,
-            idxDat.lastGroupNames.length - 1,
-          );
-          idxDat.groupNum--;
-          return false;
-        } else if (idxChar == '}') {
-          if (idxDat.groupNum == 0) {
-            if (fvvStack.length > 1) {
-              final targetFVVV = fvvStack.last.rootKey;
-              fvvStack.removeLast();
-              fvvStack.last.tmpFVVs.add(targetFVVV);
-              return false;
-            } else
-              return true;
-          } else {
-            endGroup = true;
-            return false;
-          }
-        } else {
-          idxDat.valueName.write(idxChar);
-          return false;
-        }
-      })()) break;
-      idx += idxChar.length;
-      lastChar = idxChar;
+    String parseName(final _TextCtx ctx) {
+      ctx.skipBlanks();
+      final name = StringBuffer();
+      while (!ctx.isEof && !ctx.prematchAny(['=', ':', '：', '<'])) name.write(ctx.next());
+      return name.isEmpty ? '' : '$name'.trimRight();
     }
+
+    void parseDesc(
+      final _TextCtx ctx,
+      final StringBuffer desc,
+      final List<FVVV> scopeStack, {
+      final bool skipBlanks = true,
+      final bool sameLine = false,
+    }) {
+      for (;;) {
+        final origIdx = ctx.index, origLine = ctx.linesStart.length;
+        if (ctx.match('<', sameLine: sameLine)) {
+          desc.clear();
+          for (;;) {
+            if (ctx.isEof) throw ctx.err.whyEOF();
+            if (ctx.match('>', skipBlanks: false)) {
+              final target = findKey('$desc', scopeStack);
+              if (target != null && target.isType<String>()) {
+                desc
+                  ..clear()
+                  ..write(target.get<String>());
+              }
+              break;
+            }
+            if (ctx.match(r'\', skipBlanks: false)) {
+              if (ctx.isEof) throw ctx.err.whyEOF();
+              if (ctx.match('>', skipBlanks: false))
+                desc.write('>');
+              else {
+                final ch = ctx.next();
+                final chc = ch.codeUnitAt(0), tgt = (chc < 1 << 8) ? _escapeTable[chc] : 0;
+                if (tgt != 0)
+                  desc.writeCharCode(tgt);
+                else
+                  desc.writeAll([r'\', ch]);
+              }
+            } else
+              desc.write(ctx.next());
+          }
+        } else {
+          if (!skipBlanks) {
+            ctx.index = origIdx;
+            while (ctx.linesStart.length > origLine) ctx.linesStart.removeLast();
+          }
+          break;
+        }
+      }
+    }
+
+    void parseText(final _TextCtx ctx, final StringBuffer text) {
+      if (ctx.match('`')) {
+        for (;;) {
+          if (ctx.isEof) throw ctx.err.whyEOF();
+          if (ctx.match('`', skipBlanks: false)) break;
+          text.write(ctx.next());
+        }
+        final tmpStr = '$text'.unindent().trim();
+        text
+          ..clear()
+          ..write(tmpStr);
+        return;
+      }
+
+      final isFullWidth = ctx.match('“');
+      if (!isFullWidth && !ctx.match('"')) throw ctx.err.unknown();
+      for (;;) {
+        if (ctx.isEof) throw ctx.err.whyEOF();
+        if (isFullWidth ? ctx.match('”', skipBlanks: false) : ctx.match('"', skipBlanks: false)) return;
+        if (ctx.match(r'\', skipBlanks: false)) {
+          if (ctx.isEof) throw ctx.err.whyEOF();
+          if (isFullWidth && ctx.match('”', skipBlanks: false))
+            text.write('”');
+          else if (!isFullWidth && ctx.match('"', skipBlanks: false))
+            text.write('"');
+          else {
+            final ch = ctx.next();
+            final chc = ch.codeUnitAt(0), tgt = (chc < 256) ? _escapeTable[chc] : 0;
+            if (tgt != 0)
+              text.writeCharCode(tgt);
+            else
+              text.writeAll([r'\', ch]);
+          }
+        } else
+          text.write(ctx.next());
+      }
+    }
+
+    num? tryParseNumber(String tgtStr) {
+      if (tgtStr.isEmpty) return null;
+      tgtStr = tgtStr.replaceAll("'", '').replaceAll('’', '');
+      if (tgtStr.isEmpty) return null;
+
+      var sign = 1;
+      var idx = 0;
+      if (tgtStr.startsWith('-')) {
+        sign = -1;
+        idx++;
+      } else if (tgtStr.startsWith('+')) idx++;
+
+      var radix = 10;
+      if (idx < tgtStr.length && tgtStr[idx] == '0' && idx + 1 < tgtStr.length)
+        switch (tgtStr[idx + 1]) {
+          case 'x' || 'X':
+            radix = 16;
+            idx = idx + 2;
+          case 'o' || 'O':
+            radix = 8;
+            idx = idx + 2;
+          case 'b' || 'B':
+            radix = 2;
+            idx = idx + 2;
+          case '0' || '1' || '2' || '3' || '4' || '5' || '6' || '7':
+            radix = 8;
+            idx++;
+        }
+
+      final digitStr = tgtStr.substring(idx);
+      if (digitStr.isEmpty) return null;
+      final tgtVal = switch (radix) {
+        _ when radix != 10 => int.tryParse(digitStr, radix: radix),
+        _ when digitStr.contains('.') || digitStr.contains('e') || digitStr.contains('E') =>
+          double.tryParse(digitStr),
+        _ => int.tryParse(digitStr)
+      };
+      return tgtVal != null ? tgtVal * sign : null;
+    }
+
+    void parseValue(
+      final _TextCtx ctx,
+      final List<FVVV> scopeStack,
+      final FVVV tgtFwv,
+      final StringBuffer idxDesc, {
+      final bool inList = false,
+    }) {
+      for (;;) {
+        parseDesc(ctx, idxDesc, scopeStack, skipBlanks: inList, sameLine: !inList);
+        if (ctx.isEof ||
+            (inList
+                ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］'])
+                : !ctx.isSameLine() || ctx.matchAny([';', '；']))) throw ctx.err.notFound('value');
+
+        final tmpSb = StringBuffer();
+        String tmpStr;
+        if (ctx.prematchAny(['"', '“', '`'])) {
+          parseText(ctx, tmpSb);
+          tmpStr = '$tmpSb';
+          if (tgtFwv._value == null)
+            tgtFwv._value = tmpStr;
+          else
+            tgtFwv
+              ..link = ''
+              .._value = '${tgtFwv._value}$tmpStr';
+        } else {
+          while (!ctx.isEof && !ctx.prematchAny(['<', '+']) && !ctx.prematchAny(['\r', '\n']))
+            if (inList ? ctx.prematchAny([',', '，', ']', '］']) : ctx.prematchAny([';', '；']))
+              break;
+            else
+              tmpSb.write(ctx.next());
+          tmpStr = '$tmpSb'.trimRight();
+          if (tmpStr.isEmpty) throw ctx.err.notFound('value');
+
+          const equality = CaseInsensitiveEquality();
+          final isTrue = equality.equals(tmpStr, 'true');
+          if (isTrue || equality.equals(tmpStr, 'false')) {
+            if (tgtFwv._value == null)
+              tgtFwv._value = isTrue;
+            else
+              tgtFwv
+                ..link = ''
+                .._value = '${tgtFwv._value}$tmpStr';
+          } else {
+            final tmpNum = tryParseNumber(tmpStr);
+            if (tmpNum != null) {
+              if (tgtFwv._value == null)
+                tgtFwv._value = tmpNum;
+              else
+                tgtFwv
+                  ..link = ''
+                  .._value = '${tgtFwv._value}$tmpStr';
+            } else {
+              final target = findKey(tmpStr, scopeStack);
+              if (target != null) {
+                if (tgtFwv._value != null && target._value is List) throw ctx.err.plusList();
+                if (tgtFwv._value == null)
+                  tgtFwv
+                    ..link = tmpStr
+                    .._value = target._value;
+                else
+                  tgtFwv
+                    ..link = ''
+                    .._value = '${tgtFwv._value}${target._value}';
+                tgtFwv.nodes = target.nodes;
+              } else
+                throw ctx.err.noValue(tmpStr);
+            }
+          }
+        }
+        parseDesc(ctx, idxDesc, scopeStack, skipBlanks: false, sameLine: true);
+        if (ctx.isEof ||
+            !ctx.isSameLine() ||
+            (inList ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］']) : ctx.matchAny([';', '；'])))
+          return;
+
+        if (ctx.match('+'))
+          continue;
+        else
+          throw ctx.err.notFound('+');
+      }
+    }
+
+    scopeStack.add(this);
+
+    for (;;) {
+      final idxDesc = StringBuffer();
+      parseDesc(ctx, idxDesc, scopeStack, skipBlanks: false);
+      if (!ctx.isSameLine()) idxDesc.clear();
+
+      if (ctx.isEof || ctx.prematchAny(['}', '｝'])) break;
+
+      final name = parseName(ctx);
+      if (name.isEmpty) throw ctx.err.notFound('name');
+      parseDesc(ctx, idxDesc, scopeStack);
+      if (!ctx.matchAny(['=', ':', '：'])) throw ctx.err.notFound('=');
+      parseDesc(ctx, idxDesc, scopeStack);
+
+      var goto = false;
+      final tgtKey = this[name];
+      if (ctx.matchAny(['[', '［'])) {
+        var tgtList = <dynamic>[];
+        var listType = Null;
+        for (;;) {
+          final valueDesc = StringBuffer();
+          parseDesc(ctx, valueDesc, scopeStack, skipBlanks: false);
+          if (!ctx.isSameLine()) valueDesc.clear();
+
+          if (ctx.isEof) throw ctx.err.whyEOF();
+          if (ctx.matchAny(['{', '｛'])) {
+            listType = FVVV;
+            final tmpValue = FVVV().._parseMain(ctx, scopeStack);
+            if (!ctx.matchAny(['}', '｝'])) throw ctx.err.notFound('}');
+            parseDesc(ctx, valueDesc, scopeStack, skipBlanks: false, sameLine: true);
+            tmpValue.desc = '$valueDesc';
+            tgtList.add(tmpValue);
+            if (ctx.isSameLine() && !ctx.matchAny([',', '，']) && !ctx.prematchAny([']', '］']))
+              throw ctx.err.notFound('EOL');
+          } else {
+            final tgtFwv = FVVV();
+            parseValue(ctx, scopeStack, tgtFwv, idxDesc, inList: true);
+
+            if (tgtFwv._value is List)
+              tgtList.addAll(tgtFwv._value as List);
+            else if (tgtFwv._value != null)
+              tgtList.add(tgtFwv._value);
+            else
+              tgtList.add(tgtFwv);
+
+            if (listType == Null)
+              listType = tgtList.last.runtimeType;
+            else if (listType != tgtList.last.runtimeType) {
+              if (listType == FVVV || tgtList.last.runtimeType == FVVV) throw ctx.err.valuePlusFVVV();
+              switch (tgtList.last) {
+                case String _:
+                  listType = String;
+                case double _:
+                  if (listType != String) listType = double;
+                case int _:
+                  if (listType != String && listType != double) listType = int;
+              }
+            }
+          }
+          if (ctx.matchAny([']', '］'])) break;
+        }
+        if (listType == Null) throw ctx.err.notFound('value');
+        if (listType != FVVV) {
+          tgtList = tgtList
+              .map(
+                (final item) => item.runtimeType == listType
+                    ? item
+                    : switch (listType) {
+                        const (String) => '$item',
+                        const (double) => switch (item) {
+                            final int item => item.toDouble(),
+                            final bool item => item ? 1.0 : 0.0,
+                            _ => item
+                          },
+                        const (int) => switch (item) { final bool item => item ? 1 : 0, _ => item },
+                        const (bool) => item as bool,
+                        _ => throw ctx.err.unknown()
+                      },
+              )
+              .toList();
+        }
+        tgtKey._value = switch (listType) {
+          const (FVVV) => tgtList.cast<FVVV>().toList(),
+          const (String) => tgtList.cast<String>().toList(),
+          const (double) => tgtList.cast<double>().toList(),
+          const (int) => tgtList.cast<int>().toList(),
+          const (bool) => tgtList.cast<bool>().toList(),
+          _ => throw ctx.err.unknown()
+        };
+      } else if (ctx.matchAny(['{', '｛'])) {
+        tgtKey._parseMain(ctx, scopeStack);
+        if (!ctx.matchAny(['}', '｝'])) throw ctx.err.notFound('}');
+      } else {
+        parseValue(ctx, scopeStack, tgtKey, idxDesc);
+        goto = true;
+      }
+
+      if (!goto) {
+        parseDesc(ctx, idxDesc, scopeStack, skipBlanks: false, sameLine: true);
+        if (ctx.isSameLine() && !ctx.isEof && !ctx.matchAny([';', '；'])) throw ctx.err.notFound('EOL');
+      }
+      tgtKey.desc = '$idxDesc';
+    }
+
+    scopeStack.removeLast();
   }
+}
+
+class _TextCtx {
+  _TextCtx(this.input) {
+    err = _ErrHandler(this);
+    if (input.startsWith('\uFEFF')) index = 1;
+  }
+
+  final String input;
+  var index = 0;
+  final linesStart = [0];
+  late final _ErrHandler err;
+
+  String preview() => isEof ? '' : input[index];
+  bool prematch(final String tgt) => input.startsWith(tgt, index);
+  bool prematchAny(final List<String> tgts) => tgts.any(prematch);
+
+  String next() {
+    if (isEof) return '';
+    final ch = input[index++];
+    if (ch == '\r')
+      linesStart.add(index);
+    else if (ch == '\n') {
+      if (index >= 2 && input[index - 2] == '\r')
+        linesStart[linesStart.length - 1] = index;
+      else
+        linesStart.add(index);
+    }
+    return ch;
+  }
+
+  bool match(final String tgt, {final bool skipBlanks = true, final bool sameLine = false}) {
+    if (skipBlanks) this.skipBlanks(sameLine: sameLine);
+    if (prematch(tgt)) {
+      index += tgt.length;
+      return true;
+    }
+    return false;
+  }
+
+  bool matchAny(final List<String> tgts, {final bool skipBlanks = true, final bool sameLine = false}) =>
+      tgts.any((final tgt) => match(tgt, skipBlanks: skipBlanks, sameLine: sameLine));
+
+  void skipBlanks({final bool sameLine = false}) {
+    while (!isEof && RegExp(r'\s').hasMatch(preview()))
+      if (sameLine && prematchAny(['\n', '\r']))
+        break;
+      else
+        next();
+  }
+
+  bool get isEof => index >= input.length;
+  bool isSameLine() {
+    final before = linesStart.length;
+    skipBlanks();
+    return linesStart.length == before;
+  }
+}
+
+class ParseException implements Exception {
+  ParseException(this.message);
+
+  final String message;
+  @override
+  String toString() => 'ParseException: $message';
+}
+
+class _ErrHandler {
+  _ErrHandler(this._ctx);
+
+  final _TextCtx _ctx;
+
+  ParseException _makeError(final String msg) =>
+      ParseException('${_ctx.linesStart.length}:${_ctx.index - _ctx.linesStart.last + 1}: $msg');
+
+  ParseException unknown() => _makeError('Why??? IDK!!!');
+  ParseException whyEOF() => _makeError('Why EOF???');
+  ParseException whyNotEOF() => _makeError('Why not EOF???');
+  ParseException notFound(final String tgt) =>
+      _makeError("Where is the ${tgt.runes.length > 1 ? tgt : "'$tgt'"}?");
+  ParseException noValue(final String tgt) => _makeError("Cannot find the value of '$tgt'");
+  ParseException plusList() => _makeError('Why plus with list?');
+  ParseException valuePlusFVVV() => _makeError('Why value plus with FVVV?');
 }
