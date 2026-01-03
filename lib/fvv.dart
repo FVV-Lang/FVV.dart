@@ -10,6 +10,7 @@
 // For the F2DLPR License terms and conditions, visit: <http://license.fileto.download>.             =
 //====================================================================================================
 
+import 'dart:convert';
 import 'dart:core';
 import 'dart:typed_data';
 
@@ -37,9 +38,6 @@ class FVVV {
           const MapEquality<String, FVVV>().equals(other.nodes, nodes));
   @override
   int get hashCode => Object.hash(_value, const MapEquality<String, FVVV>().hash(nodes));
-
-  @override
-  String toString() => '${_value ?? nodes}';
 
   bool get isEmpty => switch (_value) {
         null => true,
@@ -85,6 +83,69 @@ class FVVV {
     }
     ctx.skipBlanks();
     if (!ctx.isEof) throw ctx.err.whyNotEOF();
+  }
+
+  @override
+  String toString([
+    final int? flag1,
+    final int? flag2,
+    final int? flag3,
+    final int? flag4,
+    final int? flag5,
+    final int? flag6,
+    final int? flag7,
+    final int? flag8,
+    final int? flag9,
+    final int? flag10,
+    final int? flag11,
+    final int? flag12,
+    final int? flag13,
+    final int? flag14,
+    final int? flag15,
+    final int? flag16,
+    final int? flag17,
+    final int? flag18,
+    final int? flag19,
+    final int? flag20,
+    final int? flag21,
+  ]) {
+    final flags = [
+      flag1,
+      flag2,
+      flag3,
+      flag4,
+      flag5,
+      flag6,
+      flag7,
+      flag8,
+      flag9,
+      flag10,
+      flag11,
+      flag12,
+      flag13,
+      flag14,
+      flag15,
+      flag16,
+      flag17,
+      flag18,
+      flag19,
+      flag20,
+      flag21,
+    ].whereType<int>().fold(FormatOpt.common, (final flags, final idxFlag) => flags | idxFlag);
+    final ret = StringBuffer();
+    final ctx = _FormatCtx(flags);
+
+    if (ctx.useWrapper) {
+      ret.write(ctx.fwvBegin);
+      if (!ctx.minify) ret.write(ctx.newline);
+    }
+    _toStringRoot(ctx, ret, ctx.useWrapper ? 1 : 0);
+    if (ctx.useWrapper) {
+      if (!ctx.minify) ret.write(ctx.newline);
+      ret.write(ctx.fwvEnd);
+    }
+
+    return '$ret';
   }
 
   void _parseMain(final _TextCtx ctx, final List<FVVV> scopeStack) {
@@ -146,7 +207,9 @@ class FVVV {
                 if (tgt != 0)
                   desc.writeCharCode(tgt);
                 else
-                  desc.writeAll([r'\', ch]);
+                  desc
+                    ..write(r'\')
+                    ..write(ch);
               }
             } else
               desc.write(ctx.next());
@@ -192,7 +255,9 @@ class FVVV {
             if (tgt != 0)
               text.writeCharCode(tgt);
             else
-              text.writeAll([r'\', ch]);
+              text
+                ..write(r'\')
+                ..write(ch);
           }
         } else
           text.write(ctx.next());
@@ -429,6 +494,306 @@ class FVVV {
 
     scopeStack.removeLast();
   }
+
+  void _toStringRoot(final _FormatCtx ctx, final StringBuffer ret, final int level) {
+    if (nodes.isEmpty) return;
+
+    nodes.entries.forEachIndexed(
+      (final idx, final entry) =>
+          entry.value._toStringMain(ctx, entry.key, ret, level, idx == nodes.length - 1),
+    );
+  }
+
+  void _toStringMain(
+    final _FormatCtx ctx,
+    String name,
+    final StringBuffer ret,
+    final int level,
+    final bool isBack,
+  ) {
+    String escapeString(final String str, {required final bool isDesc, final bool fullWidth = false}) {
+      final ret = StringBuffer();
+
+      if (isDesc)
+        ret.write('<');
+      else
+        ret.write(fullWidth ? '“' : '"');
+
+      str.runes.forEach((final chc) {
+        final ch = String.fromCharCode(chc);
+        switch (ch) {
+          case r'\':
+            ret.write(r'\\');
+          case '\b':
+            ret.write(r'\b');
+          case '\f':
+            ret.write(r'\f');
+          case '\n':
+            ret.write(r'\n');
+          case '\r':
+            ret.write(r'\r');
+          case '\t':
+            ret.write(r'\t');
+          case '"':
+            if (!fullWidth && !isDesc)
+              ret.write(r'\"');
+            else
+              ret.write(ch);
+          case '”':
+            if (fullWidth && !isDesc)
+              ret.write(r'\”');
+            else
+              ret.write(ch);
+          case '>':
+            if (isDesc)
+              ret.write(r'\>');
+            else
+              ret.write(ch);
+          default:
+            ret.write(ch);
+        }
+      });
+
+      if (isDesc)
+        ret.write('>');
+      else
+        ret.write(fullWidth ? '”' : '"');
+      return '$ret';
+    }
+
+    void toStringValue(
+      final _FormatCtx ctx,
+      dynamic tgtVal,
+      final StringBuffer ret,
+      final String indent, [
+      final int level = 0,
+    ]) {
+      switch (tgtVal) {
+        case bool _:
+          ret.write('$tgtVal');
+        case num _:
+          if (tgtVal is int && ctx.intBase != 10) {
+            if (tgtVal == 0) {
+              switch (ctx.intBase) {
+                case 16:
+                  ret.write('0x0');
+                case 8:
+                  ret.write('0o0');
+                case 2:
+                  ret.write('0b0');
+              }
+              return;
+            }
+
+            if (tgtVal < 0) ret.write('-');
+            tgtVal = tgtVal.abs();
+
+            switch (ctx.intBase) {
+              case 2:
+                ret.write('0b');
+                ret.write(tgtVal.toRadixString(2));
+              case 8:
+                ret.write('0o');
+                ret.write(tgtVal.toRadixString(8));
+              case 16:
+                ret.write('0x');
+                ret.write(tgtVal.toRadixString(16));
+            }
+            return;
+          }
+
+          final rawNum = '$tgtVal';
+          if (ctx.digitSepStep == 0) {
+            ret.write(rawNum);
+            return;
+          }
+
+          final parts = rawNum.split('.');
+          var intPart = parts[0];
+          var hasSign = false;
+          if (intPart.startsWith('-') || intPart.startsWith('+')) {
+            hasSign = true;
+            intPart = intPart.substring(1);
+          }
+          final intLen = intPart.length;
+
+          if (intLen <= ctx.digitSepStep) {
+            ret.write(rawNum);
+            return;
+          }
+
+          if (hasSign) ret.write(rawNum[0]);
+          intPart.runes.forEachIndexed((final idx, final ch) {
+            if (idx > 0 && (intLen - idx) % ctx.digitSepStep == 0) ret.write(ctx.digitSepChar);
+            ret.write(ch);
+          });
+
+          if (parts.length >= 2)
+            ret
+              ..write('.')
+              ..write(parts[1]);
+        case String _:
+          if (!ctx.minify &&
+              ctx.rawStr &&
+              tgtVal.length >= 3 &&
+              !tgtVal.contains('`') &&
+              tgtVal.trim().contains(RegExp(r'[\r\n]'))) {
+            final strIndent = indent + ctx.indentUnit;
+
+            tgtVal = tgtVal.unindent().trim();
+
+            ret
+              ..write('`')
+              ..write(ctx.newline);
+            const LineSplitter().convert(tgtVal).forEach((final line) {
+              if (line.isNotEmpty) ret.write(strIndent);
+              ret
+                ..write(line)
+                ..write(ctx.newline);
+            });
+            ret
+              ..write(indent)
+              ..write('`');
+            return;
+          }
+
+          if (level == 0 && ctx.fullWidth && '$ret'[ret.length - 1] == ' ') {
+            final tmpRet = '$ret'.substring(0, ret.length - 1);
+            ret
+              ..clear()
+              ..write(tmpRet);
+          }
+          ret.write(escapeString(tgtVal, isDesc: false, fullWidth: ctx.fullWidth));
+        case FVVV _:
+          if (ctx.fwwStyle && tgtVal.desc.isNotEmpty) {
+            ret.write(escapeString(tgtVal.desc, isDesc: true, fullWidth: ctx.fullWidth));
+            if (!ctx.minify && !ctx.fullWidth) ret.write(' ');
+          }
+          ret.write(ctx.fwvBegin);
+          if (!ctx.minify) ret.write(ctx.newline);
+          tgtVal._toStringRoot(ctx, ret, level + 1);
+          if (!ctx.minify)
+            ret
+              ..write(ctx.newline)
+              ..write(indent);
+          ret.write(ctx.fwvEnd);
+          if (!ctx.noDescs && !ctx.fwwStyle && tgtVal.desc.isNotEmpty) {
+            if (!ctx.minify && !ctx.fullWidth) ret.write(' ');
+            ret.write(escapeString(tgtVal.desc, isDesc: true, fullWidth: ctx.fullWidth));
+          }
+      }
+    }
+
+    if (name.isEmpty || (_value is! String && isEmpty && nodes.isEmpty)) return;
+
+    var tgtNode = this;
+    if (ctx.flattenPaths) {
+      final tmpName = StringBuffer(name);
+      while (tgtNode.nodes.length == 1 &&
+          (ctx.noDescs || tgtNode.desc.isEmpty) &&
+          (ctx.noLinks || tgtNode.link.isEmpty)) {
+        final nodePair = tgtNode.nodes.entries.first;
+
+        tmpName
+          ..write('.')
+          ..write(nodePair.key);
+        tgtNode = nodePair.value;
+      }
+      name = '$tmpName';
+    }
+
+    var indent = '';
+    if (!ctx.minify && level > 0) {
+      indent = ctx.indentUnit * level;
+      ret.write(indent);
+    }
+    ret
+      ..write(name)
+      ..write(ctx.assignOp);
+
+    if (!ctx.noLinks && tgtNode.link.isNotEmpty)
+      ret.write(tgtNode.link);
+    else if (tgtNode.nodes.isNotEmpty) {
+      if (ctx.fwwStyle && tgtNode.desc.isNotEmpty) {
+        ret.write(escapeString(tgtNode.desc, isDesc: true));
+        if (!ctx.minify) ret.write(' ');
+      }
+      if (ctx.fullWidth && '$ret'[ret.length - 1] == ' ') {
+        final tmpRet = '$ret'.substring(0, ret.length - 1);
+        ret
+          ..clear()
+          ..write(tmpRet);
+      }
+      ret.write(ctx.fwvBegin);
+      if (!ctx.minify) ret.write(ctx.newline);
+      tgtNode._toStringRoot(ctx, ret, level + 1);
+      if (!ctx.minify)
+        ret
+          ..write(ctx.newline)
+          ..write(indent);
+      ret.write(ctx.fwvEnd);
+    } else if (tgtNode._value is! List)
+      toStringValue(ctx, tgtNode._value, ret, indent);
+    else {
+      var multiline = false;
+      if (!ctx.minify && !ctx.listSingle) {
+        multiline = tgtNode._value is List<FVVV>;
+        if (!multiline) {
+          var longItems = 0;
+          multiline = (tgtNode._value as List).any((final item) {
+            switch (item) {
+              case final String str:
+                if (str.length + 2 >= 16) ++longItems;
+              default:
+                if ('$item'.length >= 16) ++longItems;
+            }
+            return longItems >= 6;
+          });
+        }
+      }
+
+      final valueIndent = indent + ctx.indentUnit;
+      final valueLevel = level + 1;
+
+      if (ctx.fullWidth && '$ret'[ret.length - 1] == ' ') {
+        final tmpRet = '$ret'.substring(0, ret.length - 1);
+        ret
+          ..clear()
+          ..write(tmpRet);
+      }
+      ret.write(ctx.listBegin);
+      if (multiline) ret.write(ctx.newline);
+
+      (tgtNode._value as List).forEachIndexed((final idx, final item) {
+        if (multiline) ret.write(valueIndent);
+        toStringValue(ctx, item, ret, valueIndent, valueLevel);
+        if (multiline ? ctx.forceSep : idx != (tgtNode._value as List).length - 1) {
+          ret.write(ctx.itemSep);
+          if (!multiline && !ctx.fullWidth && !ctx.minify) ret.write(' ');
+        }
+        if (multiline) ret.write(ctx.newline);
+      });
+
+      if (multiline) ret.write(indent);
+      ret.write(ctx.listEnd);
+    }
+
+    if (!ctx.noDescs &&
+        tgtNode.desc.isNotEmpty &&
+        ((tgtNode.nodes.isEmpty && (tgtNode._value is! List<FVVV>)) ||
+            tgtNode.link.isNotEmpty ||
+            !ctx.fwwStyle)) {
+      if (!ctx.minify &&
+          (!ctx.fullWidth ||
+              tgtNode.link.isNotEmpty ||
+              (tgtNode.nodes.isEmpty && tgtNode._value is! List && tgtNode._value is! String) ||
+              (tgtNode._value is String && '$ret'[ret.length - 1] == '`'))) ret.write(' ');
+      ret.write(escapeString(tgtNode.desc, isDesc: true));
+    }
+
+    if (ctx.minify || ctx.forceSep) ret.write(ctx.stmtSep);
+    if (!ctx.minify && !isBack) ret.write(ctx.newline);
+  }
 }
 
 class _TextCtx {
@@ -512,4 +877,119 @@ class _ErrHandler {
   ParseException noValue(final String tgt) => _makeError("Cannot find the value of '$tgt'");
   ParseException plusList() => _makeError('Why plus with list?');
   ParseException valuePlusFVVV() => _makeError('Why value plus with FVVV?');
+}
+
+abstract class FormatOpt {
+  static const common = 0;
+
+  static const useWrapper = 1 << 0;
+  static const minify = 1 << 1;
+
+  static const useCRLF = 1 << 2;
+  static const useCR = 1 << 3;
+
+  static const useSpace2 = 1 << 4;
+  static const useSpace4 = 1 << 5;
+
+  static const intBinary = 1 << 6;
+  static const intOctal = 1 << 7;
+  static const intHex = 1 << 8;
+
+  static const digitSep3 = 1 << 9;
+  static const digitSep4 = 1 << 10;
+
+  static const useColon = 1 << 11;
+  static const fullWidth = 1 << 12;
+
+  static const keepListSingle = 1 << 13;
+  static const forceUseSeparator = 1 << 14;
+  static const rawMultilineString = 1 << 15;
+
+  static const noDescs = 1 << 16;
+  static const noLinks = 1 << 17;
+  static const flattenPaths = 1 << 18;
+  static const fwwStyle = 1 << 19;
+}
+
+class _FormatCtx {
+  _FormatCtx(final int flags) {
+    if ((flags & FormatOpt.useWrapper) != 0) useWrapper = true;
+
+    if ((flags & FormatOpt.useCRLF) != 0)
+      newline = '\r\n';
+    else if ((flags & FormatOpt.useCR) != 0) newline = '\r';
+
+    if ((flags & FormatOpt.useSpace2) != 0)
+      indentUnit = '  ';
+    else if ((flags & FormatOpt.useSpace4) != 0) indentUnit = '    ';
+
+    if ((flags & FormatOpt.intHex) != 0)
+      intBase = 16;
+    else if ((flags & FormatOpt.intOctal) != 0)
+      intBase = 8;
+    else if ((flags & FormatOpt.intBinary) != 0) intBase = 2;
+
+    if ((flags & FormatOpt.digitSep3) != 0)
+      digitSepStep = 3;
+    else if ((flags & FormatOpt.digitSep4) != 0) digitSepStep = 4;
+
+    fullWidth = (flags & FormatOpt.fullWidth) != 0;
+    if (fullWidth) {
+      if ((flags & FormatOpt.useColon) != 0) assignOp = '：';
+      listBegin = '［';
+      listEnd = '］';
+      fwvBegin = '｛';
+      fwvEnd = '｝';
+      itemSep = '，';
+      stmtSep = '；';
+      if (digitSepStep > 0) digitSepChar = '’';
+    } else {
+      if ((flags & FormatOpt.useColon) != 0) assignOp = ': ';
+      if (digitSepStep > 0) digitSepChar = "'";
+    }
+
+    listSingle = (flags & FormatOpt.keepListSingle) != 0;
+    forceSep = (flags & FormatOpt.forceUseSeparator) != 0;
+    rawStr = (flags & FormatOpt.rawMultilineString) != 0;
+
+    noDescs = (flags & FormatOpt.noDescs) != 0;
+    noLinks = (flags & FormatOpt.noLinks) != 0;
+    flattenPaths = (flags & FormatOpt.flattenPaths) != 0;
+    fwwStyle = (flags & FormatOpt.fwwStyle) != 0;
+
+    minify = (flags & FormatOpt.minify) != 0;
+    if (minify) {
+      newline = '';
+      indentUnit = '';
+
+      assignOp = assignOp.trim();
+    }
+  }
+
+  var newline = '\n';
+  var indentUnit = '\t';
+  var assignOp = ' = ';
+  var listBegin = '[', listEnd = ']';
+  var fwvBegin = '{', fwvEnd = '}';
+  var itemSep = ',', stmtSep = ';';
+
+  var intBase = 10;
+
+  var digitSepStep = 0;
+  var digitSepChar = '';
+
+  var useWrapper = false;
+
+  var minify = false;
+
+  var fullWidth = false;
+
+  var listSingle = false;
+  var forceSep = false;
+  var rawStr = false;
+
+  var noDescs = false, noLinks = false;
+
+  var flattenPaths = false;
+  var fwwStyle = false;
 }
