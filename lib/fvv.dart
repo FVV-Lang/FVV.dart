@@ -326,7 +326,8 @@ class FVVV {
         if (ctx.isEof ||
             (inList
                 ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］'])
-                : !ctx.isSameLine() || ctx.matchAny([';', '；']))) throw ctx.err.notFound('value');
+                : !ctx.isSameLine() || ctx.matchAny([';', '；']) || ctx.prematchAny(['}', '｝'])))
+          throw ctx.err.notFound('value');
 
         final tmpSb = StringBuffer();
         String tmpStr;
@@ -341,7 +342,7 @@ class FVVV {
               .._value = '${tgtFwv._value}$tmpStr';
         } else {
           while (!ctx.isEof && !ctx.prematchAny(['<', '+']) && !ctx.prematchAny(['\r', '\n']))
-            if (inList ? ctx.prematchAny([',', '，', ']', '］']) : ctx.prematchAny([';', '；']))
+            if (inList ? ctx.prematchAny([',', '，', ']', '］']) : ctx.prematchAny([';', '；', '}', '｝']))
               break;
             else
               tmpSb.write(ctx.next());
@@ -387,8 +388,9 @@ class FVVV {
         parseDesc(ctx, idxDesc, scopeStack, skipBlanks: false, sameLine: true);
         if (ctx.isEof ||
             !ctx.isSameLine() ||
-            (inList ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］']) : ctx.matchAny([';', '；'])))
-          return;
+            (inList
+                ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］'])
+                : ctx.matchAny([';', '；']) || ctx.prematchAny(['}', '｝']))) return;
 
         if (ctx.match('+'))
           continue;
@@ -499,7 +501,8 @@ class FVVV {
 
       if (!goto) {
         parseDesc(ctx, idxDesc, scopeStack, skipBlanks: false, sameLine: true);
-        if (ctx.isSameLine() && !ctx.isEof && !ctx.matchAny([';', '；'])) throw ctx.err.notFound('EOL');
+        if (ctx.isSameLine() && !ctx.isEof && !ctx.matchAny([';', '；']) && !ctx.prematchAny(['}', '｝']))
+          throw ctx.err.notFound('EOL');
       }
       tgtKey.desc = '$idxDesc';
     }
