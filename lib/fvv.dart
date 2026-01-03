@@ -55,6 +55,11 @@ class FVVV {
   T get<T>() => as()!;
   List<T> list<T>(final List<T>? defaultValue) => as(defaultValue) ?? <T>[];
 
+  void unlink() {
+    link = '';
+    nodes.forEach((final _, final value) => value.unlink());
+  }
+
   static final Uint8List _escapeTable = () {
     final table = Uint8List(1 << 8);
 
@@ -67,7 +72,7 @@ class FVVV {
 
     return table;
   }();
-  void parseString(final String text) {
+  void parseString(final String text, {final FVVStruct? target}) {
     if (text.trim().isEmpty) return;
 
     final ctx = _TextCtx(text);
@@ -83,6 +88,8 @@ class FVVV {
     }
     ctx.skipBlanks();
     if (!ctx.isEof) throw ctx.err.whyNotEOF();
+
+    if (target != null) to(target);
   }
 
   @override
@@ -147,6 +154,9 @@ class FVVV {
 
     return '$ret';
   }
+
+  void to(final FVVStruct target) => target.fields(_ReaderBinder(this));
+  void from(final FVVStruct target) => target.fields(_WriterBinder(this..unlink()));
 
   void _parseMain(final _TextCtx ctx, final List<FVVV> scopeStack) {
     FVVV? findKey(final String path, final List<FVVV> scopeStack) {
@@ -455,6 +465,7 @@ class FVVV {
               .map(
                 (final item) => item.runtimeType == listType
                     ? item
+                    // ignore: switch_on_type
                     : switch (listType) {
                         const (String) => '$item',
                         const (double) => switch (item) {
@@ -469,6 +480,7 @@ class FVVV {
               )
               .toList();
         }
+        // ignore: switch_on_type
         tgtKey._value = switch (listType) {
           const (FVVV) => tgtList.cast<FVVV>().toList(),
           const (String) => tgtList.cast<String>().toList(),
@@ -796,6 +808,53 @@ class FVVV {
   }
 }
 
+abstract class FormatOpt {
+  static const common = 0;
+
+  static const useWrapper = 1 << 0;
+  static const minify = 1 << 1;
+
+  static const useCRLF = 1 << 2;
+  static const useCR = 1 << 3;
+
+  static const useSpace2 = 1 << 4;
+  static const useSpace4 = 1 << 5;
+
+  static const intBinary = 1 << 6;
+  static const intOctal = 1 << 7;
+  static const intHex = 1 << 8;
+
+  static const digitSep3 = 1 << 9;
+  static const digitSep4 = 1 << 10;
+
+  static const useColon = 1 << 11;
+  static const fullWidth = 1 << 12;
+
+  static const keepListSingle = 1 << 13;
+  static const forceUseSeparator = 1 << 14;
+  static const rawMultilineString = 1 << 15;
+
+  static const noDescs = 1 << 16;
+  static const noLinks = 1 << 17;
+  static const flattenPaths = 1 << 18;
+  static const fwwStyle = 1 << 19;
+}
+
+// ignore: one_member_abstracts
+abstract interface class FVVBinder {
+  void field<T>(
+    final String key,
+    final T Function() getter,
+    final void Function(T val) setter, {
+    final FVVStruct Function()? factory,
+  });
+}
+
+// ignore: one_member_abstracts
+abstract interface class FVVStruct {
+  void fields(final FVVBinder binder);
+}
+
 class _TextCtx {
   _TextCtx(this.input) {
     err = _ErrHandler(this);
@@ -879,38 +938,6 @@ class _ErrHandler {
   ParseException valuePlusFVVV() => _makeError('Why value plus with FVVV?');
 }
 
-abstract class FormatOpt {
-  static const common = 0;
-
-  static const useWrapper = 1 << 0;
-  static const minify = 1 << 1;
-
-  static const useCRLF = 1 << 2;
-  static const useCR = 1 << 3;
-
-  static const useSpace2 = 1 << 4;
-  static const useSpace4 = 1 << 5;
-
-  static const intBinary = 1 << 6;
-  static const intOctal = 1 << 7;
-  static const intHex = 1 << 8;
-
-  static const digitSep3 = 1 << 9;
-  static const digitSep4 = 1 << 10;
-
-  static const useColon = 1 << 11;
-  static const fullWidth = 1 << 12;
-
-  static const keepListSingle = 1 << 13;
-  static const forceUseSeparator = 1 << 14;
-  static const rawMultilineString = 1 << 15;
-
-  static const noDescs = 1 << 16;
-  static const noLinks = 1 << 17;
-  static const flattenPaths = 1 << 18;
-  static const fwwStyle = 1 << 19;
-}
-
 class _FormatCtx {
   _FormatCtx(final int flags) {
     if ((flags & FormatOpt.useWrapper) != 0) useWrapper = true;
@@ -992,4 +1019,59 @@ class _FormatCtx {
 
   var flattenPaths = false;
   var fwwStyle = false;
+}
+
+class _ReaderBinder implements FVVBinder {
+  _ReaderBinder(this.node);
+
+  final FVVV node;
+
+  @override
+  void field<T>(
+    final String key,
+    final T Function() getter,
+    final void Function(T val) setter, {
+    final FVVStruct Function()? factory,
+  }) {
+    final tgtNode = node.nodes[key];
+    if (tgtNode == null) return;
+    final target = getter();
+
+    if (target is FVVStruct)
+      tgtNode.to(target);
+    else if (factory != null && target is List<FVVStruct> && tgtNode._value is List<FVVV>) {
+      target.clear();
+      (tgtNode._value as List<FVVV>)
+          .forEach((final item) => target.add(factory()..fields(_ReaderBinder(item))));
+    } else
+      setter(tgtNode._value as T);
+  }
+}
+
+class _WriterBinder implements FVVBinder {
+  _WriterBinder(this.node);
+
+  final FVVV node;
+
+  @override
+  void field<T>(
+    final String key,
+    final T Function() getter,
+    final void Function(T val) setter, {
+    final FVVStruct Function()? factory,
+  }) {
+    final target = getter();
+    final tmpNode = FVVV();
+    if (target is FVVStruct)
+      target.fields(_WriterBinder(tmpNode));
+    else if (target is List<FVVStruct>)
+      tmpNode._value = target.map((final item) {
+        final idxNode = FVVV();
+        item.fields(_WriterBinder(idxNode));
+        return idxNode;
+      }).toList();
+    else
+      tmpNode._value = target;
+    node.nodes[key] = tmpNode;
+  }
 }
