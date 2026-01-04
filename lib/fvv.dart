@@ -49,6 +49,7 @@ class FVVV {
   bool get isNotEmpty => !isEmpty;
 
   bool isType<T>() => _value is T;
+  bool isList<T>() => _value is List<T>;
   Type get type => _value.runtimeType;
 
   T? as<T>([final T? defaultValue]) => isType<T>() ? _value as T : defaultValue;
