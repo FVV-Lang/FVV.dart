@@ -27,15 +27,15 @@ class FVVV {
 
   FVVV operator [](final String key) =>
       key.split('.').fold(this, (final tgt, final path) => tgt.nodes.putIfAbsent(path, FVVV.new));
-  void operator []=(final String key, final dynamic val) => this[key].value = val;
+  void operator []=(final String key, final dynamic tgt) => this[key].value = tgt;
   dynamic get value => _value;
-  set value(final dynamic val) => _value = val is FVVV ? val._value : val;
+  set value(final dynamic tgt) => _value = tgt is FVVV ? tgt._value : tgt;
   @override
   bool operator ==(final other) =>
       identical(this, other) ||
       (other is FVVV &&
           _value == other._value &&
-          const MapEquality<String, FVVV>().equals(other.nodes, nodes));
+          const MapEquality<String, FVVV>().equals(nodes, other.nodes));
   @override
   int get hashCode => Object.hash(_value, const MapEquality<String, FVVV>().hash(nodes));
 
@@ -51,27 +51,26 @@ class FVVV {
   bool isType<T>() => _value is T;
   Type get type => _value.runtimeType;
 
-  T? as<T>([final T? defaultValue]) => _value is T ? _value as T : defaultValue;
+  T? as<T>([final T? defaultValue]) => isType<T>() ? _value as T : defaultValue;
+  T? asType<T>([final T? defaultValue]) => as(defaultValue);
   T get<T>() => as()!;
-  List<T> list<T>(final List<T>? defaultValue) => as(defaultValue) ?? <T>[];
+  List<T> list<T>(final List<T>? defaultValue) => as(defaultValue) ?? [];
+
+  bool get boolean => as(false)!;
+  int get integer => as(0)!;
+  double get float => as(0)!;
+  String get string => as('')!;
+  List<bool> get bools => as([])!;
+  List<int> get ints => as([])!;
+  List<double> get doubles => as([])!;
+  List<String> get strings => as([])!;
+  List<FVVV> get fvvvs => as([])!;
 
   void unlink() {
     link = '';
     nodes.forEach((final _, final value) => value.unlink());
   }
 
-  static final Uint8List _escapeTable = () {
-    final table = Uint8List(1 << 8);
-
-    table['b'.codeUnitAt(0)] = '\b'.codeUnitAt(0);
-    table['f'.codeUnitAt(0)] = '\f'.codeUnitAt(0);
-    table['n'.codeUnitAt(0)] = '\n'.codeUnitAt(0);
-    table['r'.codeUnitAt(0)] = '\r'.codeUnitAt(0);
-    table['t'.codeUnitAt(0)] = '\t'.codeUnitAt(0);
-    table[r'\'.codeUnitAt(0)] = r'\'.codeUnitAt(0);
-
-    return table;
-  }();
   void parseString(final String text, {final FVVStruct? target}) {
     if (text.trim().isEmpty) return;
 
@@ -158,24 +157,40 @@ class FVVV {
   void to(final FVVStruct target) => target.fields(_ReaderBinder(this));
   void from(final FVVStruct target) => target.fields(_WriterBinder(this..unlink()));
 
+  static final Uint8List _escapeTable = () {
+    final table = Uint8List(1 << 8);
+
+    table['b'.codeUnitAt(0)] = '\b'.codeUnitAt(0);
+    table['f'.codeUnitAt(0)] = '\f'.codeUnitAt(0);
+    table['n'.codeUnitAt(0)] = '\n'.codeUnitAt(0);
+    table['r'.codeUnitAt(0)] = '\r'.codeUnitAt(0);
+    table['t'.codeUnitAt(0)] = '\t'.codeUnitAt(0);
+    table[r'\'.codeUnitAt(0)] = r'\'.codeUnitAt(0);
+
+    return table;
+  }();
+  static int? _getEscapedChar(final String ch) {
+    final chc = ch.codeUnitAt(0);
+    return (chc < _escapeTable.length)
+        ? _escapeTable[chc] != 0
+            ? _escapeTable[chc]
+            : null
+        : null;
+  }
+
   void _parseMain(final _TextCtx ctx, final List<FVVV> scopeStack) {
     FVVV? findKey(final String path, final List<FVVV> scopeStack) {
       final paths = path.split('.');
       if (paths.isEmpty) return null;
-      FVVV? target;
-      for (final index in scopeStack.reversed) {
-        target = index;
-        for (final idxPath in paths) {
-          if (target!.nodes.containsKey(idxPath))
-            target = target[idxPath];
-          else {
-            target = null;
-            break;
-          }
-        }
-        if (target != null) return target;
-      }
-      return null;
+
+      return scopeStack.reversed
+          .map(
+            (final index) => paths.fold<FVVV?>(
+              index,
+              (final target, final idxPath) => target?.nodes[idxPath],
+            ),
+          )
+          .firstWhereOrNull((final target) => target != null);
     }
 
     String parseName(final _TextCtx ctx) {
@@ -194,42 +209,40 @@ class FVVV {
     }) {
       for (;;) {
         final origIdx = ctx.index, origLine = ctx.linesStart.length;
-        if (ctx.match('<', sameLine: sameLine)) {
-          desc.clear();
-          for (;;) {
-            if (ctx.isEof) throw ctx.err.whyEOF();
-            if (ctx.match('>', skipBlanks: false)) {
-              final target = findKey('$desc', scopeStack);
-              if (target != null && target.isType<String>()) {
-                desc
-                  ..clear()
-                  ..write(target.get<String>());
-              }
-              break;
-            }
-            if (ctx.match(r'\', skipBlanks: false)) {
-              if (ctx.isEof) throw ctx.err.whyEOF();
-              if (ctx.match('>', skipBlanks: false))
-                desc.write('>');
-              else {
-                final ch = ctx.next();
-                final chc = ch.codeUnitAt(0), tgt = (chc < 1 << 8) ? _escapeTable[chc] : 0;
-                if (tgt != 0)
-                  desc.writeCharCode(tgt);
-                else
-                  desc
-                    ..write(r'\')
-                    ..write(ch);
-              }
-            } else
-              desc.write(ctx.next());
-          }
-        } else {
+        if (!ctx.match('<', sameLine: sameLine)) {
           if (!skipBlanks) {
             ctx.index = origIdx;
             while (ctx.linesStart.length > origLine) ctx.linesStart.removeLast();
           }
           break;
+        }
+
+        desc.clear();
+        for (;;) {
+          if (ctx.isEof) throw ctx.err.whyEOF();
+          if (ctx.match('>', skipBlanks: false)) {
+            final target = findKey('$desc', scopeStack);
+            if (target != null && target.isType<String>())
+              desc
+                ..clear()
+                ..write(target.get<String>());
+            break;
+          }
+          if (ctx.match(r'\', skipBlanks: false)) {
+            if (ctx.isEof) throw ctx.err.whyEOF();
+            if (ctx.match('>', skipBlanks: false))
+              desc.write('>');
+            else {
+              final ch = ctx.next(), tgt = _getEscapedChar(ch);
+              if (tgt != null)
+                desc.writeCharCode(tgt);
+              else
+                desc
+                  ..write(r'\')
+                  ..write(ch);
+            }
+          } else
+            desc.write(ctx.next());
         }
       }
     }
@@ -260,9 +273,8 @@ class FVVV {
           else if (!isFullWidth && ctx.match('"', skipBlanks: false))
             text.write('"');
           else {
-            final ch = ctx.next();
-            final chc = ch.codeUnitAt(0), tgt = (chc < 256) ? _escapeTable[chc] : 0;
-            if (tgt != 0)
+            final ch = ctx.next(), tgt = _getEscapedChar(ch);
+            if (tgt != null)
               text.writeCharCode(tgt);
             else
               text
@@ -275,7 +287,6 @@ class FVVV {
     }
 
     num? tryParseNumber(String tgtStr) {
-      if (tgtStr.isEmpty) return null;
       tgtStr = tgtStr.replaceAll("'", '').replaceAll('’', '');
       if (tgtStr.isEmpty) return null;
 
@@ -283,24 +294,24 @@ class FVVV {
       var idx = 0;
       if (tgtStr.startsWith('-')) {
         sign = -1;
-        idx++;
-      } else if (tgtStr.startsWith('+')) idx++;
+        ++idx;
+      } else if (tgtStr.startsWith('+')) ++idx;
 
       var radix = 10;
       if (idx < tgtStr.length && tgtStr[idx] == '0' && idx + 1 < tgtStr.length)
         switch (tgtStr[idx + 1]) {
           case 'x' || 'X':
             radix = 16;
-            idx = idx + 2;
+            idx += 2;
           case 'o' || 'O':
             radix = 8;
-            idx = idx + 2;
+            idx += 2;
           case 'b' || 'B':
             radix = 2;
-            idx = idx + 2;
+            idx += 2;
           case '0' || '1' || '2' || '3' || '4' || '5' || '6' || '7':
             radix = 8;
-            idx++;
+            ++idx;
         }
 
       final digitStr = tgtStr.substring(idx);
@@ -330,23 +341,21 @@ class FVVV {
           throw ctx.err.notFound('value');
 
         final tmpSb = StringBuffer();
-        String tmpStr;
         if (ctx.prematchAny(['"', '“', '`'])) {
           parseText(ctx, tmpSb);
-          tmpStr = '$tmpSb';
           if (tgtFwv._value == null)
-            tgtFwv._value = tmpStr;
+            tgtFwv._value = '$tmpSb';
           else
             tgtFwv
               ..link = ''
-              .._value = '${tgtFwv._value}$tmpStr';
+              .._value = '${tgtFwv._value}$tmpSb';
         } else {
           while (!ctx.isEof && !ctx.prematchAny(['<', '+']) && !ctx.prematchAny(['\r', '\n']))
             if (inList ? ctx.prematchAny([',', '，', ']', '］']) : ctx.prematchAny([';', '；', '}', '｝']))
               break;
             else
               tmpSb.write(ctx.next());
-          tmpStr = '$tmpSb'.trimRight();
+          final tmpStr = '$tmpSb'.trimRight();
           if (tmpStr.isEmpty) throw ctx.err.notFound('value');
 
           const equality = CaseInsensitiveEquality();
@@ -461,8 +470,7 @@ class FVVV {
           }
           if (ctx.matchAny([']', '］'])) break;
         }
-        if (listType == Null) throw ctx.err.notFound('value');
-        if (listType != FVVV) {
+        if (listType != FVVV)
           tgtList = tgtList
               .map(
                 (final item) => item.runtimeType == listType
@@ -476,12 +484,10 @@ class FVVV {
                             _ => item
                           },
                         const (int) => switch (item) { final bool item => item ? 1 : 0, _ => item },
-                        const (bool) => item as bool,
-                        _ => throw ctx.err.unknown()
+                        _ => item
                       },
               )
               .toList();
-        }
         // ignore: switch_on_type
         tgtKey._value = switch (listType) {
           const (FVVV) => tgtList.cast<FVVV>().toList(),
@@ -911,7 +917,7 @@ class _TextCtx {
   bool isSameLine() {
     final before = linesStart.length;
     skipBlanks();
-    return linesStart.length == before;
+    return before == linesStart.length;
   }
 }
 
