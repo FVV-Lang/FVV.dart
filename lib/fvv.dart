@@ -949,7 +949,7 @@ class _ErrHandler {
 
 class _FormatCtx {
   _FormatCtx(final int flags) {
-    if ((flags & FormatOpt.useWrapper) != 0) useWrapper = true;
+    useWrapper = (flags & FormatOpt.useWrapper) != 0;
 
     if ((flags & FormatOpt.useCRLF) != 0)
       newline = '\r\n';
@@ -1025,7 +1025,6 @@ class _FormatCtx {
   var rawStr = false;
 
   var noDescs = false, noLinks = false;
-
   var flattenPaths = false;
   var fwwStyle = false;
 }
