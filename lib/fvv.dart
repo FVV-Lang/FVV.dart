@@ -17,6 +17,38 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:indent/indent.dart';
 
+abstract class FormatOpt {
+  static const common = 0;
+
+  static const useWrapper = 1 << 0;
+  static const minify = 1 << 1;
+
+  static const useCRLF = 1 << 2;
+  static const useCR = 1 << 3;
+
+  static const useSpace2 = 1 << 4;
+  static const useSpace4 = 1 << 5;
+
+  static const intBinary = 1 << 6;
+  static const intOctal = 1 << 7;
+  static const intHex = 1 << 8;
+
+  static const digitSep3 = 1 << 9;
+  static const digitSep4 = 1 << 10;
+
+  static const useColon = 1 << 11;
+  static const fullWidth = 1 << 12;
+
+  static const keepListSingle = 1 << 13;
+  static const forceUseSeparator = 1 << 14;
+  static const rawMultilineString = 1 << 15;
+
+  static const noDescs = 1 << 16;
+  static const noLinks = 1 << 17;
+  static const flattenPaths = 1 << 18;
+  static const fwwStyle = 1 << 19;
+}
+
 class FVVV {
   FVVV({final dynamic value, final Map<String, FVVV>? nodes, this.desc = '', this.link = ''})
       : _value = value,
@@ -816,38 +848,6 @@ class FVVV {
     if (ctx.minify || ctx.forceSep) ret.write(ctx.stmtSep);
     if (!ctx.minify && !isBack) ret.write(ctx.newline);
   }
-}
-
-abstract class FormatOpt {
-  static const common = 0;
-
-  static const useWrapper = 1 << 0;
-  static const minify = 1 << 1;
-
-  static const useCRLF = 1 << 2;
-  static const useCR = 1 << 3;
-
-  static const useSpace2 = 1 << 4;
-  static const useSpace4 = 1 << 5;
-
-  static const intBinary = 1 << 6;
-  static const intOctal = 1 << 7;
-  static const intHex = 1 << 8;
-
-  static const digitSep3 = 1 << 9;
-  static const digitSep4 = 1 << 10;
-
-  static const useColon = 1 << 11;
-  static const fullWidth = 1 << 12;
-
-  static const keepListSingle = 1 << 13;
-  static const forceUseSeparator = 1 << 14;
-  static const rawMultilineString = 1 << 15;
-
-  static const noDescs = 1 << 16;
-  static const noLinks = 1 << 17;
-  static const flattenPaths = 1 << 18;
-  static const fwwStyle = 1 << 19;
 }
 
 // ignore: one_member_abstracts
