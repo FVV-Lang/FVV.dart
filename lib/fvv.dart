@@ -187,8 +187,8 @@ class FVVV {
     return '$ret';
   }
 
-  void to(final FVVStruct target) => target.fields(_ReaderBinder(this));
-  void from(final FVVStruct target) => target.fields(_WriterBinder(this..unlink()));
+  void to(final FVVStruct target) => target.fvvValues(_ReaderBinder(this));
+  void from(final FVVStruct target) => target.fvvValues(_WriterBinder(this..unlink()));
 
   static final Uint8List _escapeTable = () {
     final table = Uint8List(1 << 8);
@@ -852,7 +852,7 @@ class FVVV {
 
 // ignore: one_member_abstracts
 abstract interface class FVVBinder {
-  void field<T>(
+  void value<T>(
     final String key,
     final T Function() getter,
     final void Function(T val) setter, {
@@ -862,7 +862,7 @@ abstract interface class FVVBinder {
 
 // ignore: one_member_abstracts
 abstract interface class FVVStruct {
-  void fields(final FVVBinder binder);
+  void fvvValues(final FVVBinder binder);
 }
 
 class _TextCtx {
@@ -1036,7 +1036,7 @@ class _ReaderBinder implements FVVBinder {
   final FVVV node;
 
   @override
-  void field<T>(
+  void value<T>(
     final String key,
     final T Function() getter,
     final void Function(T val) setter, {
@@ -1051,7 +1051,7 @@ class _ReaderBinder implements FVVBinder {
     else if (factory != null && target is List<FVVStruct> && tgtNode._value is List<FVVV>) {
       target.clear();
       (tgtNode._value as List<FVVV>)
-          .forEach((final item) => target.add(factory()..fields(_ReaderBinder(item))));
+          .forEach((final item) => target.add(factory()..fvvValues(_ReaderBinder(item))));
     } else
       setter(tgtNode._value as T);
   }
@@ -1063,7 +1063,7 @@ class _WriterBinder implements FVVBinder {
   final FVVV node;
 
   @override
-  void field<T>(
+  void value<T>(
     final String key,
     final T Function() getter,
     final void Function(T val) setter, {
@@ -1072,11 +1072,11 @@ class _WriterBinder implements FVVBinder {
     final target = getter();
     final tmpNode = FVVV();
     if (target is FVVStruct)
-      target.fields(_WriterBinder(tmpNode));
+      target.fvvValues(_WriterBinder(tmpNode));
     else if (target is List<FVVStruct>)
       tmpNode._value = target.map((final item) {
         final idxNode = FVVV();
-        item.fields(_WriterBinder(idxNode));
+        item.fvvValues(_WriterBinder(idxNode));
         return idxNode;
       }).toList();
     else
