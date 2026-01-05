@@ -294,8 +294,7 @@ class FVVV {
         return;
       }
 
-      final isFullWidth = ctx.match('“');
-      if (!isFullWidth && !ctx.match('"')) throw ctx.err.unknown();
+      final isFullWidth = ctx.match('“') || !ctx.match('"');
       for (;;) {
         if (ctx.isEof) throw ctx.err.whyEOF();
         if (isFullWidth ? ctx.match('”', skipBlanks: false) : ctx.match('"', skipBlanks: false)) return;
@@ -615,6 +614,23 @@ class FVVV {
       return '$ret';
     }
 
+    void toStringFWV(
+      final _FormatCtx ctx,
+      final FVVV tgtFwv,
+      final StringBuffer ret,
+      final String indent,
+      final int level,
+    ) {
+      ret.write(ctx.fwvBegin);
+      if (!ctx.minify) ret.write(ctx.newline);
+      tgtFwv._toStringRoot(ctx, ret, level + 1);
+      if (!ctx.minify)
+        ret
+          ..write(ctx.newline)
+          ..write(indent);
+      ret.write(ctx.fwvEnd);
+    }
+
     void toStringValue(
       final _FormatCtx ctx,
       dynamic tgtVal,
@@ -645,14 +661,12 @@ class FVVV {
             switch (ctx.intBase) {
               case 2:
                 ret.write('0b');
-                ret.write(tgtVal.toRadixString(2));
               case 8:
                 ret.write('0o');
-                ret.write(tgtVal.toRadixString(8));
               case 16:
                 ret.write('0x');
-                ret.write(tgtVal.toRadixString(16));
             }
+            ret.write(tgtVal.toRadixString(ctx.intBase));
             return;
           }
 
@@ -723,14 +737,7 @@ class FVVV {
             ret.write(escapeString(tgtVal.desc, isDesc: true, fullWidth: ctx.fullWidth));
             if (!ctx.minify && !ctx.fullWidth) ret.write(' ');
           }
-          ret.write(ctx.fwvBegin);
-          if (!ctx.minify) ret.write(ctx.newline);
-          tgtVal._toStringRoot(ctx, ret, level + 1);
-          if (!ctx.minify)
-            ret
-              ..write(ctx.newline)
-              ..write(indent);
-          ret.write(ctx.fwvEnd);
+          toStringFWV(ctx, tgtVal, ret, indent, level);
           if (!ctx.noDescs && !ctx.fwwStyle && tgtVal.desc.isNotEmpty) {
             if (!ctx.minify && !ctx.fullWidth) ret.write(' ');
             ret.write(escapeString(tgtVal.desc, isDesc: true, fullWidth: ctx.fullWidth));
@@ -778,14 +785,7 @@ class FVVV {
           ..clear()
           ..write(tmpRet);
       }
-      ret.write(ctx.fwvBegin);
-      if (!ctx.minify) ret.write(ctx.newline);
-      tgtNode._toStringRoot(ctx, ret, level + 1);
-      if (!ctx.minify)
-        ret
-          ..write(ctx.newline)
-          ..write(indent);
-      ret.write(ctx.fwvEnd);
+      toStringFWV(ctx, tgtNode, ret, indent, level);
     } else if (tgtNode._value is! List)
       toStringValue(ctx, tgtNode._value, ret, indent);
     else {
