@@ -1,1 +1,1 @@
-# [README](https://app.niggergo.work/docs/fw)
+# [README](https://app.niggergo.work/fw)
