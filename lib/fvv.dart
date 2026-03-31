@@ -53,8 +53,8 @@ abstract class FormatOpt {
 
 class FVVV {
   FVVV({final dynamic value, final Map<String, FVVV>? nodes, this.desc = '', this.link = ''})
-      : _value = value,
-        nodes = nodes ?? {};
+    : _value = value,
+      nodes = nodes ?? {};
   dynamic _value;
   Map<String, FVVV> nodes;
   String desc, link;
@@ -67,18 +67,16 @@ class FVVV {
   @override
   bool operator ==(final other) =>
       identical(this, other) ||
-      (other is FVVV &&
-          _value == other._value &&
-          const MapEquality<String, FVVV>().equals(nodes, other.nodes));
+      (other is FVVV && _value == other._value && const MapEquality<String, FVVV>().equals(nodes, other.nodes));
   @override
   int get hashCode => Object.hash(_value, const MapEquality<String, FVVV>().hash(nodes));
 
   bool get isEmpty => switch (_value) {
-        null => true,
-        final String str => str.isEmpty,
-        final List<dynamic> list => list.isEmpty,
-        _ => false
-      };
+    null => true,
+    final String str => str.isEmpty,
+    final List<dynamic> list => list.isEmpty,
+    _ => false,
+  };
 
   bool get isNotEmpty => !isEmpty;
 
@@ -208,8 +206,8 @@ class FVVV {
     final chc = ch.codeUnitAt(0);
     return (chc < _escapeTable.length)
         ? _escapeTable[chc] != 0
-            ? _escapeTable[chc]
-            : null
+              ? _escapeTable[chc]
+              : null
         : null;
   }
 
@@ -219,12 +217,7 @@ class FVVV {
       if (paths.isEmpty) return null;
 
       return scopeStack.reversed
-          .map(
-            (final index) => paths.fold<FVVV?>(
-              index,
-              (final target, final idxPath) => target?.nodes[idxPath],
-            ),
-          )
+          .map((final index) => paths.fold<FVVV?>(index, (final target, final idxPath) => target?.nodes[idxPath]))
           .firstWhereOrNull((final target) => target != null);
     }
 
@@ -329,7 +322,8 @@ class FVVV {
       if (tgtStr.startsWith('-')) {
         sign = -1;
         ++idx;
-      } else if (tgtStr.startsWith('+')) ++idx;
+      } else if (tgtStr.startsWith('+'))
+        ++idx;
 
       var radix = 10;
       if (idx < tgtStr.length && tgtStr[idx] == '0' && idx + 1 < tgtStr.length)
@@ -352,9 +346,8 @@ class FVVV {
       if (digitStr.isEmpty) return null;
       final tgtVal = switch (radix) {
         _ when radix != 10 => int.tryParse(digitStr, radix: radix),
-        _ when digitStr.contains('.') || digitStr.contains('e') || digitStr.contains('E') =>
-          double.tryParse(digitStr),
-        _ => int.tryParse(digitStr)
+        _ when digitStr.contains('.') || digitStr.contains('e') || digitStr.contains('E') => double.tryParse(digitStr),
+        _ => int.tryParse(digitStr),
       };
       return tgtVal != null ? tgtVal * sign : null;
     }
@@ -433,7 +426,8 @@ class FVVV {
             !ctx.isSameLine() ||
             (inList
                 ? ctx.matchAny([',', '，']) || ctx.prematchAny([']', '］'])
-                : ctx.matchAny([';', '；']) || ctx.prematchAny(['}', '｝']))) return;
+                : ctx.matchAny([';', '；']) || ctx.prematchAny(['}', '｝'])))
+          return;
 
         if (ctx.match('+'))
           continue;
@@ -475,8 +469,7 @@ class FVVV {
             parseDesc(ctx, valueDesc, scopeStack, skipBlanks: false, sameLine: true);
             tmpValue.desc = '$valueDesc';
             tgtList.add(tmpValue);
-            if (ctx.isSameLine() && !ctx.matchAny([',', '，']) && !ctx.prematchAny([']', '］']))
-              throw ctx.err.notFound('EOL');
+            if (ctx.isSameLine() && !ctx.matchAny([',', '，']) && !ctx.prematchAny([']', '］'])) throw ctx.err.notFound('EOL');
           } else {
             final tgtFwv = FVVV();
             parseValue(ctx, scopeStack, tgtFwv, idxDesc, inList: true);
@@ -513,12 +506,15 @@ class FVVV {
                     : switch (listType) {
                         const (String) => '$item',
                         const (double) => switch (item) {
-                            final int item => item.toDouble(),
-                            final bool item => item ? 1.0 : 0.0,
-                            _ => item
-                          },
-                        const (int) => switch (item) { final bool item => item ? 1 : 0, _ => item },
-                        _ => item
+                          final int item => item.toDouble(),
+                          final bool item => item ? 1.0 : 0.0,
+                          _ => item,
+                        },
+                        const (int) => switch (item) {
+                          final bool item => item ? 1 : 0,
+                          _ => item,
+                        },
+                        _ => item,
                       },
               )
               .toList();
@@ -529,7 +525,7 @@ class FVVV {
           const (double) => tgtList.cast<double>().toList(),
           const (int) => tgtList.cast<int>().toList(),
           const (bool) => tgtList.cast<bool>().toList(),
-          _ => throw ctx.err.unknown()
+          _ => throw ctx.err.unknown(),
         };
       } else if (ctx.matchAny(['{', '｛'])) {
         tgtKey._parseMain(ctx, scopeStack);
@@ -554,18 +550,11 @@ class FVVV {
     if (nodes.isEmpty) return;
 
     nodes.entries.forEachIndexed(
-      (final idx, final entry) =>
-          entry.value._toStringMain(ctx, entry.key, ret, level, idx == nodes.length - 1),
+      (final idx, final entry) => entry.value._toStringMain(ctx, entry.key, ret, level, idx == nodes.length - 1),
     );
   }
 
-  void _toStringMain(
-    final _FormatCtx ctx,
-    String name,
-    final StringBuffer ret,
-    final int level,
-    final bool isBack,
-  ) {
+  void _toStringMain(final _FormatCtx ctx, String name, final StringBuffer ret, final int level, final bool isBack) {
     String escapeString(final String str, {required final bool isDesc, final bool fullWidth = false}) {
       final ret = StringBuffer();
 
@@ -616,13 +605,7 @@ class FVVV {
       return '$ret';
     }
 
-    void toStringFWV(
-      final _FormatCtx ctx,
-      final FVVV tgtFwv,
-      final StringBuffer ret,
-      final String indent,
-      final int level,
-    ) {
+    void toStringFWV(final _FormatCtx ctx, final FVVV tgtFwv, final StringBuffer ret, final String indent, final int level) {
       ret.write(ctx.fwvBegin);
       if (!ctx.minify) ret.write(ctx.newline);
       tgtFwv._toStringRoot(ctx, ret, level + 1);
@@ -752,9 +735,7 @@ class FVVV {
     var tgtNode = this;
     if (ctx.flattenPaths) {
       final tmpName = StringBuffer(name);
-      while (tgtNode.nodes.length == 1 &&
-          (ctx.noDescs || tgtNode.desc.isEmpty) &&
-          (ctx.noLinks || tgtNode.link.isEmpty)) {
+      while (tgtNode.nodes.length == 1 && (ctx.noDescs || tgtNode.desc.isEmpty) && (ctx.noLinks || tgtNode.link.isEmpty)) {
         final nodePair = tgtNode.nodes.entries.first;
 
         tmpName
@@ -836,14 +817,13 @@ class FVVV {
 
     if (!ctx.noDescs &&
         tgtNode.desc.isNotEmpty &&
-        ((tgtNode.nodes.isEmpty && (tgtNode._value is! List<FVVV>)) ||
-            tgtNode.link.isNotEmpty ||
-            !ctx.fwwStyle)) {
+        ((tgtNode.nodes.isEmpty && (tgtNode._value is! List<FVVV>)) || tgtNode.link.isNotEmpty || !ctx.fwwStyle)) {
       if (!ctx.minify &&
           (!ctx.fullWidth ||
               tgtNode.link.isNotEmpty ||
               (tgtNode.nodes.isEmpty && tgtNode._value is! List && tgtNode._value is! String) ||
-              (tgtNode._value is String && '$ret'[ret.length - 1] == '`'))) ret.write(' ');
+              (tgtNode._value is String && '$ret'[ret.length - 1] == '`')))
+        ret.write(' ');
       ret.write(escapeString(tgtNode.desc, isDesc: true));
     }
 
@@ -943,8 +923,7 @@ class _ErrHandler {
   ParseException unknown() => _makeError('Why??? IDK!!!');
   ParseException whyEOF() => _makeError('Why EOF???');
   ParseException whyNotEOF() => _makeError('Why not EOF???');
-  ParseException notFound(final String tgt) =>
-      _makeError("Where is the ${tgt.runes.length > 1 ? tgt : "'$tgt'"}?");
+  ParseException notFound(final String tgt) => _makeError("Where is the ${tgt.runes.length > 1 ? tgt : "'$tgt'"}?");
   ParseException noValue(final String tgt) => _makeError("Cannot find the value of '$tgt'");
   ParseException plusList() => _makeError('Why plus with list?');
   ParseException valuePlusFVVV() => _makeError('Why value plus with FVVV?');
@@ -956,21 +935,25 @@ class _FormatCtx {
 
     if ((flags & FormatOpt.useCRLF) != 0)
       newline = '\r\n';
-    else if ((flags & FormatOpt.useCR) != 0) newline = '\r';
+    else if ((flags & FormatOpt.useCR) != 0)
+      newline = '\r';
 
     if ((flags & FormatOpt.useSpace2) != 0)
       indentUnit = '  ';
-    else if ((flags & FormatOpt.useSpace4) != 0) indentUnit = '    ';
+    else if ((flags & FormatOpt.useSpace4) != 0)
+      indentUnit = '    ';
 
     if ((flags & FormatOpt.intHex) != 0)
       intBase = 16;
     else if ((flags & FormatOpt.intOctal) != 0)
       intBase = 8;
-    else if ((flags & FormatOpt.intBinary) != 0) intBase = 2;
+    else if ((flags & FormatOpt.intBinary) != 0)
+      intBase = 2;
 
     if ((flags & FormatOpt.digitSep3) != 0)
       digitSepStep = 3;
-    else if ((flags & FormatOpt.digitSep4) != 0) digitSepStep = 4;
+    else if ((flags & FormatOpt.digitSep4) != 0)
+      digitSepStep = 4;
 
     fullWidth = (flags & FormatOpt.fullWidth) != 0;
     if (fullWidth) {
@@ -1052,8 +1035,7 @@ class _ReaderBinder implements FVVBinder {
       tgtNode.to(target);
     else if (factory != null && target is List<FVVStruct> && tgtNode._value is List<FVVV>) {
       target.clear();
-      (tgtNode._value as List<FVVV>)
-          .forEach((final item) => target.add(factory()..fvvValues(_ReaderBinder(item))));
+      (tgtNode._value as List<FVVV>).forEach((final item) => target.add(factory()..fvvValues(_ReaderBinder(item))));
     } else
       setter(tgtNode._value as T);
   }
